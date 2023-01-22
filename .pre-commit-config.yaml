@@ -21,7 +21,7 @@ repos:
         additional_dependencies: [
           'flake8-bugbear',
         ]
-        args: ['--config', '.github/helper/.flake8_strict']
+        args: ['--config', '.flake8_strict']
 
   - repo: https://github.com/psf/black
     rev: 22.12.0
