@@ -1,0 +1,149 @@
+{
+ "actions": [],
+ "creation": "2023-01-27 13:11:34.053573",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "key_name",
+  "cardinality",
+  "column_break_8hnm",
+  "table",
+  "column_name",
+  "section_break_uijz",
+  "collation",
+  "seq_in_index",
+  "sub_part",
+  "column_break_iw79",
+  "index_type",
+  "packed",
+  "non_unique",
+  "section_break_zh1f",
+  "null",
+  "comment",
+  "column_break_rdli",
+  "ignored",
+  "index_comment"
+ ],
+ "fields": [
+  {
+   "fieldname": "table",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Table"
+  },
+  {
+   "default": "0",
+   "fieldname": "non_unique",
+   "fieldtype": "Check",
+   "label": "Non_unique"
+  },
+  {
+   "fieldname": "key_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Key_name"
+  },
+  {
+   "fieldname": "seq_in_index",
+   "fieldtype": "Int",
+   "label": "Seq_in_index"
+  },
+  {
+   "fieldname": "column_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Column_name"
+  },
+  {
+   "fieldname": "collation",
+   "fieldtype": "Data",
+   "label": "Collation"
+  },
+  {
+   "fieldname": "cardinality",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Cardinality"
+  },
+  {
+   "fieldname": "sub_part",
+   "fieldtype": "Data",
+   "label": "Sub_part"
+  },
+  {
+   "fieldname": "packed",
+   "fieldtype": "Data",
+   "label": "Packed"
+  },
+  {
+   "fieldname": "null",
+   "fieldtype": "Data",
+   "label": "Null"
+  },
+  {
+   "fieldname": "index_type",
+   "fieldtype": "Data",
+   "label": "Index_type"
+  },
+  {
+   "fieldname": "comment",
+   "fieldtype": "Data",
+   "label": "Comment"
+  },
+  {
+   "fieldname": "index_comment",
+   "fieldtype": "Data",
+   "label": "Index_comment"
+  },
+  {
+   "fieldname": "ignored",
+   "fieldtype": "Data",
+   "label": "Ignored"
+  },
+  {
+   "fieldname": "column_break_8hnm",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_uijz",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_iw79",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_zh1f",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_rdli",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "in_create": 1,
+ "is_virtual": 1,
+ "links": [],
+ "modified": "2023-01-27 17:12:28.494784",
+ "modified_by": "Administrator",
+ "module": "Toolbox",
+ "name": "MariaDB Index",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "select": 1,
+   "share": 1
+  }
+ ],
+ "sort_field": "cardinality",
+ "sort_order": "DESC",
+ "states": []
+}
