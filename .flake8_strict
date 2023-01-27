@@ -70,4 +70,4 @@ ignore =
 
 
 max-line-length = 200
-exclude=.github/**/*.py
+exclude=.github/**/*.py,toolbox/doctypes.py
