@@ -1,0 +1,52 @@
+{
+ "charts": [],
+ "content": "[{\"id\":\"oZvri3L9DM\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Toolbox</span>\",\"col\":12}},{\"id\":\"wotZaWJVUQ\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Queries\",\"col\":3}},{\"id\":\"A1vgmEcuNY\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Tables\",\"col\":3}},{\"id\":\"pu4Xty2Zwg\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Indexes\",\"col\":3}}]",
+ "creation": "2023-01-28 12:41:28.998511",
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "quantity-1",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "Toolbox",
+ "links": [],
+ "modified": "2023-01-28 16:00:36.290104",
+ "modified_by": "Administrator",
+ "module": "Toolbox",
+ "name": "Toolbox",
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [
+  {
+   "role": "System Manager"
+  }
+ ],
+ "sequence_id": 31.0,
+ "shortcuts": [
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Queries",
+   "link_to": "MariaDB Query",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Tables",
+   "link_to": "MariaDB Table",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Indexes",
+   "link_to": "MariaDB Index",
+   "type": "DocType"
+  }
+ ],
+ "title": "Toolbox"
+}
