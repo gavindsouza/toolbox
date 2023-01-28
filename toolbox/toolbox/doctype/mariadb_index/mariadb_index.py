@@ -67,7 +67,12 @@ class MariaDBIndex(Document):
         self.update(document_data)
 
     @staticmethod
-    def get_list(args):
+    def get_list(args=None):
+        _args = {"filters": [], "fields": [], "start": 0, "page_length": 20, "order_by": ""}
+        _args.update(args or {})
+        args = _args
+        del _args
+
         order_by = get_mapped_field(args["order_by"]) or "cardinality desc, name"
         start, page_length = args["start"], args["page_length"]
         fields = get_accessible_fields(args["fields"])
