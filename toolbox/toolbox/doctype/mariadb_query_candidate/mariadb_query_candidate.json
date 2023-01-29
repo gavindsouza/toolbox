@@ -13,15 +13,17 @@
   {
    "fieldname": "query",
    "fieldtype": "Link",
+   "in_list_view": 1,
    "label": "Query",
-   "options": "MariaDB Query"
+   "options": "MariaDB Query",
+   "read_only": 1,
+   "reqd": 1
   }
  ],
- "index_web_pages_for_search": 1,
  "is_virtual": 1,
  "istable": 1,
  "links": [],
- "modified": "2023-01-28 12:26:07.015259",
+ "modified": "2023-01-29 15:33:00.464691",
  "modified_by": "Administrator",
  "module": "Toolbox",
  "name": "MariaDB Query Candidate",

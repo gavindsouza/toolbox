@@ -8,7 +8,9 @@
  "engine": "InnoDB",
  "field_order": [
   "exists",
-  "_table_name"
+  "num_queries",
+  "_table_name",
+  "queries"
  ],
  "fields": [
   {
@@ -27,11 +29,29 @@
    "label": "Table Name",
    "read_only": 1,
    "unique": 1
+  },
+  {
+   "fieldname": "queries",
+   "fieldtype": "Table",
+   "is_virtual": 1,
+   "label": "Queries",
+   "options": "MariaDB Query Candidate"
+  },
+  {
+   "fieldname": "num_queries",
+   "fieldtype": "Int",
+   "is_virtual": 1,
+   "label": "No. of Queries"
   }
  ],
- "index_web_pages_for_search": 1,
- "links": [],
- "modified": "2023-01-28 15:28:55.679383",
+ "links": [
+  {
+   "link_doctype": "MariaDB Query",
+   "link_fieldname": "table",
+   "table_fieldname": "_table_name"
+  }
+ ],
+ "modified": "2023-01-29 14:37:13.531043",
  "modified_by": "Administrator",
  "module": "Toolbox",
  "name": "MariaDB Table",

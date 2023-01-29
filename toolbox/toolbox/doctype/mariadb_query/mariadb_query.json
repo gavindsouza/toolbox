@@ -90,9 +90,8 @@
    "label": "Occurence"
   }
  ],
- "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2023-01-28 15:35:45.692085",
+ "modified": "2023-01-29 14:34:05.704563",
  "modified_by": "Administrator",
  "module": "Toolbox",
  "name": "MariaDB Query",
@@ -110,7 +109,9 @@
    "write": 1
   }
  ],
+ "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
- "states": []
+ "states": [],
+ "title_field": "query"
 }
