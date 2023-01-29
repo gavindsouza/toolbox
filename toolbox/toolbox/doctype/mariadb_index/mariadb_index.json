@@ -10,6 +10,7 @@
   "cardinality",
   "column_break_8hnm",
   "table",
+  "frappe_table_id",
   "column_name",
   "section_break_uijz",
   "collation",
@@ -121,12 +122,17 @@
   {
    "fieldname": "column_break_rdli",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "frappe_table_id",
+   "fieldtype": "Data",
+   "hidden": 1
   }
  ],
  "in_create": 1,
  "is_virtual": 1,
  "links": [],
- "modified": "2023-01-27 17:12:28.494784",
+ "modified": "2023-01-29 17:01:52.207788",
  "modified_by": "Administrator",
  "module": "Toolbox",
  "name": "MariaDB Index",

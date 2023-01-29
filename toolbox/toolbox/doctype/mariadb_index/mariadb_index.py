@@ -19,12 +19,14 @@ FIELD_ALIAS = {
     "index_type": "INDEX_TYPE",
     "cardinality": "CARDINALITY",
     "collation": "COLLATION",
+    "frappe_table_id": "f.`name`",
 }
 
 INDEX_QUERY = dedent(
     """
     SELECT
         TABLE_NAME `table`,
+        f.name `frappe_table_id`,
         INDEX_NAME key_name,
         COLUMN_NAME column_name,
         NON_UNIQUE non_unique,
@@ -37,7 +39,9 @@ INDEX_QUERY = dedent(
         NULL creation,
         NULL modified
     FROM
-        INFORMATION_SCHEMA.STATISTICS"""
+        INFORMATION_SCHEMA.STATISTICS s LEFT JOIN `tabMariaDB Table` f
+    ON
+        s.TABLE_NAME = f._table_name"""
 )
 
 
@@ -60,7 +64,7 @@ class MariaDBIndex(Document):
     def load_from_db(self):
         table, index = self.name.split("--")
         document_data = frappe.db.sql(
-            f"{INDEX_QUERY} WHERE TABLE_NAME = %s AND INDEX_NAME = %s",
+            f"{INDEX_QUERY} WHERE f.name = %s AND INDEX_NAME = %s",
             (table, index),
             as_dict=True,
         )[0]
@@ -98,7 +102,7 @@ def wrap_query_constant(value: str) -> str:
 
 
 def wrap_query_field(value: str) -> str:
-    if "`" != value[0]:
+    if "`" != value[0] and "`" not in value:
         return f"`{value}`"
     return value
 

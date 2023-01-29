@@ -49,9 +49,14 @@
    "link_doctype": "MariaDB Query",
    "link_fieldname": "table",
    "table_fieldname": "_table_name"
+  },
+  {
+   "link_doctype": "MariaDB Index",
+   "link_fieldname": "frappe_table_id",
+   "table_fieldname": "_table_name"
   }
  ],
- "modified": "2023-01-29 14:37:13.531043",
+ "modified": "2023-01-29 17:27:19.647649",
  "modified_by": "Administrator",
  "module": "Toolbox",
  "name": "MariaDB Table",
