@@ -28,6 +28,7 @@ def process_sql_metadata(context):
     with frappe.init_site(get_site(context)), check_dbms_compatibility(
         frappe.conf
     ), handle_redis_connection_error():
+        sql_count = 0
         frappe.connect()
         exported_data = export_data()
 
@@ -77,11 +78,13 @@ def process_sql_metadata(context):
                             }
                         )
                         query_record.insert()
+                    sql_count += 1
 
             print(f"Write Transactions: {frappe.db.transaction_writes}", end="\r")
-            frappe.db.commit()
 
+        print(f"Processed {sql_count} queries")
         delete_recording.callback()
+        frappe.db.commit()
 
 
 @contextmanager
