@@ -22,92 +22,143 @@ def delete_recording(context):
 @click.command("process-sql-metadata")
 @pass_context
 def process_sql_metadata(context):
-    from html import escape
-
     import frappe
     from frappe.recorder import export_data
 
     with frappe.init_site(get_site(context)), check_dbms_compatibility(
         frappe.conf
     ), handle_redis_connection_error():
-        sql_count = 0
         frappe.connect()
-        exported_data = export_data()
 
-        for tbl in frappe.db.get_tables(cached=False):
-            if not frappe.db.exists("MariaDB Table", {"_table_name": tbl}):
-                table_record = frappe.new_doc("MariaDB Table")
-                table_record._table_name = tbl
-                table_record.insert()
+        sql_count = 0
+        TOOLBOX_TABLES = frappe.get_all("DocType", {"module": "Toolbox"}, pluck="name")
+
+        record_database_state()
+        exported_data = export_data()
 
         for func_call in exported_data:
             for query_info in func_call["calls"]:
+                query = query_info["query"]
+
+                if query.lower().startswith(("start", "commit", "rollback")):
+                    continue
 
                 if explain := query_info["explain_result"]:
-                    explain = explain[0]
-                    query = query_info["query"]
+                    # TODO: Handle multiple explain lines of explain output
+                    for _explain in explain:
+                        # skip Toolbox internal queries
+                        if _explain["table"] in TOOLBOX_TABLES:
+                            continue
+                        if not _explain["table"]:
+                            print(f"Skipping query: {query}")
+                            continue
 
-                    if not explain["table"]:
-                        continue
-
-                    if table_name := frappe.get_all(
-                        "MariaDB Table", {"_table_name": explain["table"]}, limit=1, pluck="name"
-                    ):
-                        table_name = table_name[0]
-                    # handle derived tables & such
-                    elif table_name := frappe.get_all(
-                        "MariaDB Table",
-                        {"_table_name": escape(explain["table"])},
-                        limit=1,
-                        pluck="name",
-                    ):
-                        table_name = table_name[0]
-                    # generate temporary table names
-                    else:
-                        table_record = frappe.new_doc("MariaDB Table")
-                        table_record._table_name = explain["table"]
-                        table_record.insert()
-                        table_name = table_record.name
-
-                    if query_name := frappe.get_all("MariaDB Query", {"query": query}, limit=1):
-                        query_record = frappe.get_doc("MariaDB Query", query_name[0])
-                        query_record.update(
-                            {
-                                "type": explain["type"],
-                                "possible_keys": explain["possible_keys"],
-                                "key": explain["key"],
-                                "key_len": explain["key_len"],
-                                "ref": explain["ref"],
-                                "rows": explain["rows"],
-                                "extra": explain["Extra"],
-                            }
-                        )
-                        query_record.occurence += 1
-                        query_record.save()
-                    else:
-                        query_record = frappe.new_doc("MariaDB Query")
-                        query_record.update(
-                            {
-                                "query": query,
-                                "table": table_name,
-                                "type": explain["type"],
-                                "possible_keys": explain["possible_keys"],
-                                "key": explain["key"],
-                                "key_len": explain["key_len"],
-                                "ref": explain["ref"],
-                                "rows": explain["rows"],
-                                "extra": explain["Extra"],
-                                "occurence": 1,
-                            }
-                        )
-                        query_record.insert()
+                        table_id = record_table(_explain["table"])
+                        record_query(query, table_id, _explain)
                     sql_count += 1
+
+                else:
+                    print(f"Skipping query: {query}")
+                    continue
 
             print(f"Write Transactions: {frappe.db.transaction_writes}", end="\r")
 
         print(f"Processed {sql_count} queries" + " " * 5)
         frappe.db.commit()
         delete_recording.callback()
+
+
+def record_database_state():
+    import frappe
+
+    for tbl in frappe.db.get_tables(cached=False):
+        if not frappe.db.exists("MariaDB Table", {"_table_name": tbl}):
+            table_record = frappe.new_doc("MariaDB Table")
+            table_record._table_name = tbl
+            table_record.insert()
+
+
+def record_table(table: str) -> str:
+    from html import escape
+
+    import frappe
+
+    if table_id := frappe.get_all("MariaDB Table", {"_table_name": table}, limit=1, pluck="name"):
+        table_id = table_id[0]
+    # handle derived tables & such
+    elif table_id := frappe.get_all(
+        "MariaDB Table",
+        {"_table_name": escape(table)},
+        limit=1,
+        pluck="name",
+    ):
+        table_id = table_id[0]
+    # generate temporary table names
+    else:
+        table_record = frappe.new_doc("MariaDB Table")
+        table_record._table_name = table
+        table_record.insert()
+        table_id = table_record.name
+
+    return table_id
+
+
+def record_query(query: str, table_id: str, explain: dict):
+    import frappe
+    from frappe.utils import cint
+
+    if query_name := frappe.get_all("MariaDB Query", {"query": query}, limit=1):
+        query_record = frappe.get_doc("MariaDB Query", query_name[0])
+
+        if query_record.get(
+            "query_explain",
+            {
+                "table": table_id,
+                "type": explain["type"],
+                "possible_keys": explain["possible_keys"],
+                "key": explain["key"],
+                "key_len": cint(explain["key_len"]),
+                "ref": explain["ref"],
+                "rows": cint(explain["rows"]),
+                "extra": explain["Extra"],
+            },
+        ):
+            query_record.occurence += 1
+            query_record.save()
+            return
+
+        query_record.append(
+            "query_explain",
+            {
+                "table": table_id,
+                "type": explain["type"],
+                "possible_keys": explain["possible_keys"],
+                "key": explain["key"],
+                "key_len": explain["key_len"],
+                "ref": explain["ref"],
+                "rows": explain["rows"],
+                "extra": explain["Extra"],
+            },
+        )
+        query_record.occurence += 1
+        query_record.save()
+    else:
+        query_record = frappe.new_doc("MariaDB Query")
+        query_record.query = query
+        query_record.append(
+            "query_explain",
+            {
+                "table": table_id,
+                "type": explain["type"],
+                "possible_keys": explain["possible_keys"],
+                "key": explain["key"],
+                "key_len": explain["key_len"],
+                "ref": explain["ref"],
+                "rows": explain["rows"],
+                "extra": explain["Extra"],
+            },
+        )
+        query_record.insert()
 
 
 @contextmanager

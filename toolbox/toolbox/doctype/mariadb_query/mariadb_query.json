@@ -10,16 +10,9 @@
  "field_order": [
   "query",
   "improved",
-  "select_type",
-  "table",
-  "type",
-  "possible_keys",
-  "key",
-  "key_len",
-  "ref",
-  "rows",
-  "extra",
-  "occurence"
+  "occurence",
+  "tables",
+  "query_explain"
  ],
  "fields": [
   {
@@ -37,61 +30,25 @@
    "label": "Improved"
   },
   {
-   "fieldname": "select_type",
-   "fieldtype": "Data",
-   "label": "Select Type"
-  },
-  {
-   "fieldname": "table",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "label": "Table",
-   "options": "MariaDB Table"
-  },
-  {
-   "fieldname": "type",
-   "fieldtype": "Data",
-   "label": "Type"
-  },
-  {
-   "fieldname": "possible_keys",
-   "fieldtype": "Data",
-   "label": "Possible Keys"
-  },
-  {
-   "fieldname": "key",
-   "fieldtype": "Data",
-   "label": "Key"
-  },
-  {
-   "fieldname": "key_len",
-   "fieldtype": "Data",
-   "label": "Key Length"
-  },
-  {
-   "fieldname": "ref",
-   "fieldtype": "Data",
-   "label": "Ref"
-  },
-  {
-   "fieldname": "rows",
-   "fieldtype": "Data",
-   "label": "Rows"
-  },
-  {
-   "fieldname": "extra",
-   "fieldtype": "Data",
-   "label": "Extra"
-  },
-  {
    "fieldname": "occurence",
    "fieldtype": "Int",
    "in_list_view": 1,
    "label": "Occurence"
+  },
+  {
+   "fieldname": "tables",
+   "fieldtype": "Data",
+   "label": "Tables"
+  },
+  {
+   "fieldname": "query_explain",
+   "fieldtype": "Table",
+   "label": "Query Explain",
+   "options": "MariaDB Query Explain"
   }
  ],
  "links": [],
- "modified": "2023-01-29 14:34:05.704563",
+ "modified": "2023-01-29 18:37:17.157773",
  "modified_by": "Administrator",
  "module": "Toolbox",
  "name": "MariaDB Query",
