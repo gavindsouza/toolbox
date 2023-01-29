@@ -15,3 +15,35 @@ class MariaDBQuery(Document):
             "MariaDB Table", filters={"name": ("in", tables_id)}, pluck="_table_name"
         )
         self.tables = frappe.as_json(tables)
+
+    def apply_explain(self, explain, table_id):
+        from frappe.utils import cint
+
+        if self.get(
+            "query_explain",
+            {
+                "table": table_id,
+                "type": explain["type"],
+                "possible_keys": explain["possible_keys"],
+                "key": explain["key"],
+                "key_len": cint(explain["key_len"]),
+                "ref": explain["ref"],
+                "rows": cint(explain["rows"]),
+                "extra": explain["Extra"],
+            },
+        ):
+            return
+
+        self.append(
+            "query_explain",
+            {
+                "table": table_id,
+                "type": explain["type"],
+                "possible_keys": explain["possible_keys"],
+                "key": explain["key"],
+                "key_len": explain["key_len"],
+                "ref": explain["ref"],
+                "rows": explain["rows"],
+                "extra": explain["Extra"],
+            },
+        )

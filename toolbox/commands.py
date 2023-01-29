@@ -3,9 +3,13 @@
 # changed `save 30 100` in redis_cache from `save ""` to persist data
 
 from contextlib import contextmanager
+from typing import TYPE_CHECKING
 
 import click
 from frappe.commands import get_site, pass_context
+
+if TYPE_CHECKING:
+    from toolbox.doctypes import MariaDBQuery
 
 
 @click.command("delete-recording")
@@ -45,6 +49,8 @@ def process_sql_metadata(context):
 
                 if explain := query_info["explain_result"]:
                     # TODO: Handle multiple explain lines of explain output
+                    query_record = record_query(query)
+
                     for _explain in explain:
                         # skip Toolbox internal queries
                         if _explain["table"] in TOOLBOX_TABLES:
@@ -54,7 +60,9 @@ def process_sql_metadata(context):
                             continue
 
                         table_id = record_table(_explain["table"])
-                        record_query(query, table_id, _explain)
+                        query_record.apply_explain(_explain, table_id)
+                        query_record.save()
+
                     sql_count += 1
 
                 else:
@@ -103,62 +111,19 @@ def record_table(table: str) -> str:
     return table_id
 
 
-def record_query(query: str, table_id: str, explain: dict):
+def record_query(query: str) -> "MariaDBQuery":
     import frappe
-    from frappe.utils import cint
 
     if query_name := frappe.get_all("MariaDB Query", {"query": query}, limit=1):
         query_record = frappe.get_doc("MariaDB Query", query_name[0])
-
-        if query_record.get(
-            "query_explain",
-            {
-                "table": table_id,
-                "type": explain["type"],
-                "possible_keys": explain["possible_keys"],
-                "key": explain["key"],
-                "key_len": cint(explain["key_len"]),
-                "ref": explain["ref"],
-                "rows": cint(explain["rows"]),
-                "extra": explain["Extra"],
-            },
-        ):
-            query_record.occurence += 1
-            query_record.save()
-            return
-
-        query_record.append(
-            "query_explain",
-            {
-                "table": table_id,
-                "type": explain["type"],
-                "possible_keys": explain["possible_keys"],
-                "key": explain["key"],
-                "key_len": explain["key_len"],
-                "ref": explain["ref"],
-                "rows": explain["rows"],
-                "extra": explain["Extra"],
-            },
-        )
         query_record.occurence += 1
-        query_record.save()
-    else:
-        query_record = frappe.new_doc("MariaDB Query")
-        query_record.query = query
-        query_record.append(
-            "query_explain",
-            {
-                "table": table_id,
-                "type": explain["type"],
-                "possible_keys": explain["possible_keys"],
-                "key": explain["key"],
-                "key_len": explain["key_len"],
-                "ref": explain["ref"],
-                "rows": explain["rows"],
-                "extra": explain["Extra"],
-            },
-        )
-        query_record.insert()
+        return query_record
+
+    query_record = frappe.new_doc("MariaDB Query")
+    query_record.query = query
+    query_record.occurence = 1
+
+    return query_record
 
 
 @contextmanager
