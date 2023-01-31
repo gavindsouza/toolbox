@@ -48,7 +48,6 @@ def process_sql_metadata(context):
                     continue
 
                 if explain := query_info["explain_result"]:
-                    # TODO: Handle multiple explain lines of explain output
                     query_record = record_query(query)
 
                     for _explain in explain:

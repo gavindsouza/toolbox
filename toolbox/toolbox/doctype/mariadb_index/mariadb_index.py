@@ -64,31 +64,37 @@ class MariaDBIndex(Document):
     def load_from_db(self):
         table, index = self.name.split("--")
         document_data = frappe.db.sql(
-            f"{INDEX_QUERY} WHERE f.name = %s AND INDEX_NAME = %s",
+            f"{INDEX_QUERY} WHERE TABLE_NAME = %s AND INDEX_NAME = %s",
             (table, index),
             as_dict=True,
         )[0]
         self.update(document_data)
 
     @staticmethod
-    def get_list(args=None):
-        _args = {"filters": [], "fields": [], "start": 0, "page_length": 20, "order_by": ""}
-        _args.update(args or {})
-        args = _args
-        del _args
+    def get_last_doc():
+        name = MariaDBIndex.get_list(limit=1, order_by="modified desc", pluck="name")
+        return MariaDBIndex("MariaDB Index", name[0]) if name else None
 
+    @staticmethod
+    def get_list(args=None, **kwargs):
+        args = get_args(args, kwargs)
         order_by = get_mapped_field(args["order_by"]) or "cardinality desc, name"
         start, page_length = args["start"], args["page_length"]
         fields = get_accessible_fields(args["fields"])
         select_query = get_index_query(fields, args["filters"])
 
-        return frappe.db.sql(
+        data = frappe.db.sql(
             f"{select_query} ORDER BY {order_by} limit {page_length} offset {start}",
             as_dict=True,
         )
 
+        if "pluck" in args:
+            return [d[args["pluck"]] for d in data]
+        return data
+
     @staticmethod
-    def get_count(args):
+    def get_count(args=None, **kwargs):
+        args = get_args(args, **kwargs)
         query = get_index_query(["count(*)"], args["filters"])
         return frappe.db.sql(query)[0][0]
 
@@ -156,3 +162,16 @@ def get_index_query(fields: list[str], filters: list[list]) -> str:
 
 def get_column_name(fieldname: str) -> str:
     return wrap_query_field(FIELD_ALIAS.get(fieldname, fieldname))
+
+
+def get_args(args=None, kwargs=None):
+    _args = {"filters": [], "fields": [], "start": 0, "page_length": 20, "order_by": ""}
+    _args.update(args or {})
+    _args.update(kwargs or {})
+
+    for limit_char in ["limit_page_length", "limit"]:
+        if limit_char in _args:
+            _args["page_length"] = _args[limit_char]
+            del _args[limit_char]
+
+    return _args
