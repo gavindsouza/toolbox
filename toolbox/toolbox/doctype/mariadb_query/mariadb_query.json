@@ -17,7 +17,7 @@
  "fields": [
   {
    "fieldname": "query",
-   "fieldtype": "Small Text",
+   "fieldtype": "Long Text",
    "in_list_view": 1,
    "label": "Query",
    "options": "SQL",
@@ -26,7 +26,7 @@
   },
   {
    "fieldname": "improved",
-   "fieldtype": "Small Text",
+   "fieldtype": "Long Text",
    "label": "Improved"
   },
   {
@@ -48,7 +48,7 @@
   }
  ],
  "links": [],
- "modified": "2023-01-29 18:37:17.157773",
+ "modified": "2023-01-31 13:46:31.715150",
  "modified_by": "Administrator",
  "module": "Toolbox",
  "name": "MariaDB Query",
