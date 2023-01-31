@@ -31,9 +31,11 @@ class TestMariaDBIndex(FrappeTestCase):
 
     def test_get_doc(self):
         last_doc = MariaDBIndex.get_last_doc()
+        last_doc_int = frappe.get_last_doc("MariaDB Index")
+        doc = frappe.get_doc("MariaDB Index", last_doc.name)
+
         self.assertIsInstance(last_doc, MariaDBIndex)
         self.assertTrue(last_doc.name)
-
-        doc = frappe.get_doc("MariaDB Index", last_doc.name)
+        self.assertDictEqual(last_doc.as_dict(), last_doc_int.as_dict())
         self.assertIsInstance(doc, MariaDBIndex)
         self.assertDictEqual(doc.as_dict(), last_doc.as_dict())

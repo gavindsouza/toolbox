@@ -88,8 +88,8 @@ class MariaDBIndex(Document):
             as_dict=True,
         )
 
-        if "pluck" in args:
-            return [d[args["pluck"]] for d in data]
+        if pluck := args.get("pluck"):
+            return [d[pluck] for d in data]
         return data
 
     @staticmethod
