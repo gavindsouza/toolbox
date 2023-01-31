@@ -33,22 +33,25 @@
    "fieldname": "occurence",
    "fieldtype": "Int",
    "in_list_view": 1,
-   "label": "Occurence"
+   "label": "Occurence",
+   "read_only": 1
   },
   {
    "fieldname": "tables",
    "fieldtype": "Data",
-   "label": "Tables"
+   "label": "Tables",
+   "read_only": 1
   },
   {
    "fieldname": "query_explain",
    "fieldtype": "Table",
    "label": "Query Explain",
-   "options": "MariaDB Query Explain"
+   "options": "MariaDB Query Explain",
+   "read_only": 1
   }
  ],
  "links": [],
- "modified": "2023-01-31 13:46:31.715150",
+ "modified": "2023-01-31 19:30:15.189185",
  "modified_by": "Administrator",
  "module": "Toolbox",
  "name": "MariaDB Query",

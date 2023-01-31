@@ -5,6 +5,8 @@ import frappe
 from frappe.model.document import Document
 from frappe.utils import cint
 
+from toolbox.utils import record_table
+
 
 class MariaDBQuery(Document):
     def validate(self):
@@ -21,20 +23,25 @@ class MariaDBQuery(Document):
         tables.sort(key=lambda x: tables_id.index(x["name"]))
         self.tables = frappe.as_json([x._table_name for x in tables], indent=0)
 
-    def apply_explain(self, explain: dict, table_id: str):
+    def apply_explain(self, explain: dict):
+        table_id = record_table(explain["table"])
+
         explain_row = {
-            "table": table_id,
             "id": explain["id"],
+            "select_type": explain["select_type"],
+            "table": table_id,
             "type": explain["type"],
             "possible_keys": explain["possible_keys"],
             "key": explain["key"],
             "key_len": cint(explain["key_len"]),
             "ref": explain["ref"],
-            "rows": cint(explain["rows"]),
             "extra": explain["Extra"],
         }
 
         if self.get("query_explain", explain_row):
             return
 
-        self.append("query_explain", explain_row)
+        self.append(
+            "query_explain",
+            explain_row | {"rows": cint(explain["rows"]), "filtered": explain.get("filtered")},
+        )

@@ -2,14 +2,8 @@
 # bench --site business.localhost execute frappe.recorder.export_data
 # changed `save 30 100` in redis_cache from `save ""` to persist data
 
-from contextlib import contextmanager
-from typing import TYPE_CHECKING
-
 import click
 from frappe.commands import get_site, pass_context
-
-if TYPE_CHECKING:
-    from toolbox.doctypes import MariaDBQuery
 
 
 @click.command("delete-recording")
@@ -29,6 +23,13 @@ def process_sql_metadata(context):
     import frappe
     from frappe.recorder import export_data
 
+    from toolbox.utils import (
+        check_dbms_compatibility,
+        handle_redis_connection_error,
+        record_database_state,
+        record_query,
+    )
+
     with frappe.init_site(get_site(context)), check_dbms_compatibility(
         frappe.conf
     ), handle_redis_connection_error():
@@ -47,25 +48,22 @@ def process_sql_metadata(context):
                 if query.lower().startswith(("start", "commit", "rollback")):
                     continue
 
-                if explain := query_info["explain_result"]:
+                if explain_data := query_info["explain_result"]:
                     query_record = record_query(query)
 
-                    for _explain in explain:
+                    for explain in explain_data:
                         # skip Toolbox internal queries
-                        if _explain["table"] in TOOLBOX_TABLES:
-                            continue
-                        if not _explain["table"]:
-                            print(f"Skipping query: {query}")
+                        if explain["table"] in TOOLBOX_TABLES:
                             continue
 
-                        table_id = record_table(_explain["table"])
-                        query_record.apply_explain(_explain, table_id)
-                        query_record.save()
+                        query_record.apply_explain(explain)
 
+                    query_record.save()
                     sql_count += 1
 
                 else:
-                    print(f"Skipping query: {query}")
+                    if not query.lower().startswith("insert"):
+                        print(f"Skipping query: {query}")
                     continue
 
             print(f"Write Transactions: {frappe.db.transaction_writes}", end="\r")
@@ -73,74 +71,6 @@ def process_sql_metadata(context):
         print(f"Processed {sql_count} queries" + " " * 5)
         frappe.db.commit()
         delete_recording.callback()
-
-
-def record_database_state():
-    import frappe
-
-    for tbl in frappe.db.get_tables(cached=False):
-        if not frappe.db.exists("MariaDB Table", {"_table_name": tbl}):
-            table_record = frappe.new_doc("MariaDB Table")
-            table_record._table_name = tbl
-            table_record.insert()
-
-
-def record_table(table: str) -> str:
-    from html import escape
-
-    import frappe
-
-    if table_id := frappe.get_all("MariaDB Table", {"_table_name": table}, limit=1, pluck="name"):
-        table_id = table_id[0]
-    # handle derived tables & such
-    elif table_id := frappe.get_all(
-        "MariaDB Table",
-        {"_table_name": escape(table)},
-        limit=1,
-        pluck="name",
-    ):
-        table_id = table_id[0]
-    # generate temporary table names
-    else:
-        table_record = frappe.new_doc("MariaDB Table")
-        table_record._table_name = table
-        table_record.insert()
-        table_id = table_record.name
-
-    return table_id
-
-
-def record_query(query: str) -> "MariaDBQuery":
-    import frappe
-
-    if query_name := frappe.get_all("MariaDB Query", {"query": query}, limit=1):
-        query_record = frappe.get_doc("MariaDB Query", query_name[0])
-        query_record.occurence += 1
-        return query_record
-
-    query_record = frappe.new_doc("MariaDB Query")
-    query_record.query = query
-    query_record.occurence = 1
-
-    return query_record
-
-
-@contextmanager
-def check_dbms_compatibility(conf):
-    if conf.db_type != "mariadb":
-        click.secho(f"WARN: This command might not be compatible with {conf.db_type}", fg="yellow")
-    yield
-
-
-@contextmanager
-def handle_redis_connection_error():
-    from redis.exceptions import ConnectionError
-
-    try:
-        yield
-    except ConnectionError as e:
-        click.secho(f"ERROR: {e}", fg="red")
-        click.secho("NOTE: Make sure Redis services are running", fg="yellow")
 
 
 @click.command("cleanup-sql-metadata")
