@@ -11,7 +11,7 @@
  "is_hidden": 0,
  "label": "Toolbox",
  "links": [],
- "modified": "2023-01-28 16:00:36.290104",
+ "modified": "2023-02-04 00:24:33.074667",
  "modified_by": "Administrator",
  "module": "Toolbox",
  "name": "Toolbox",
@@ -29,8 +29,10 @@
   {
    "color": "Grey",
    "doc_view": "List",
+   "format": "",
    "label": "Queries",
    "link_to": "MariaDB Query",
+   "stats_filter": "{\"query\":[\"is\",\"set\"]}",
    "type": "DocType"
   },
   {
@@ -38,6 +40,7 @@
    "doc_view": "List",
    "label": "Tables",
    "link_to": "MariaDB Table",
+   "stats_filter": "{\"_table_name\":[\"is\",\"set\"]}",
    "type": "DocType"
   },
   {

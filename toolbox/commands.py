@@ -78,10 +78,11 @@ def process_sql_metadata(context):
                 elif not query.lower().startswith("insert"):
                     print(f"Skipping query: {query}")
 
-            print(f"Write Transactions: {frappe.db.transaction_writes}", end="\r")
+                print(f"Write Transactions: {frappe.db.transaction_writes}", end="\r")
 
         print(f"Processed {sql_count} queries" + " " * 5)
         frappe.db.commit()
+        # the following line will delete the queries that have been logged after the processing started too
         delete_recording.callback()
 
 

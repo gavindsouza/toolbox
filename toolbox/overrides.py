@@ -1,6 +1,10 @@
 import time
 
+import frappe
 import frappe.recorder
+
+# Currently the monkey patch is applied for all sites - this is not multi-site friendly
+# TODO: Apply patch only if toolbox is installed on site
 
 
 def lighter_sql(*args, **kwargs):
@@ -19,4 +23,5 @@ def lighter_sql(*args, **kwargs):
     return result
 
 
+frappe_recorder_sql = frappe.recorder.sql
 frappe.recorder.sql = lighter_sql
