@@ -25,63 +25,57 @@ def delete_recording(context):
 @click.command("process-sql-metadata")
 @pass_context
 def process_sql_metadata(context):
+    from math import ceil
+
     import frappe
     from frappe.recorder import export_data
-    from sqlparse import format as sql_format
+    from frappe.utils.synchronization import filelock
 
     from toolbox.utils import (
         check_dbms_compatibility,
         handle_redis_connection_error,
+        process_sql_metadata_chunk,
         record_database_state,
-        record_query,
     )
 
-    with frappe.init_site(get_site(context)), check_dbms_compatibility(
+    CHUNK_SIZE = 2500
+    SITE = get_site(context)
+
+    with frappe.init_site(SITE), check_dbms_compatibility(
         frappe.conf
-    ), handle_redis_connection_error():
-        frappe.connect()
+    ), handle_redis_connection_error(), filelock("process_sql_metadata", timeout=0.1):
+        frappe.set_user("Administrator")
+        # better drop data from redis before processing, & save the list in a file if anything happens
+        queries: list[str] = [
+            query["query"] for func_call in export_data() for query in func_call["calls"]
+        ]
 
-        sql_count = 0
-        TOOLBOX_TABLES = frappe.get_all("DocType", {"module": "Toolbox"}, pluck="name")
+        NUM_JOBS = 1
+        if len(queries) > CHUNK_SIZE:
+            NUM_JOBS = ceil(len(queries) / CHUNK_SIZE)
 
-        record_database_state()
-        exported_data = export_data()
+        print(f"Processing {len(queries):,} queries in {NUM_JOBS} jobs")
 
-        for func_call in exported_data:
-            for query_info in func_call["calls"]:
-                query = query_info["query"]
+        if NUM_JOBS > 1:
+            from multiprocessing import Pool
 
-                if query.lower().startswith(("start", "commit", "rollback")):
-                    continue
+            frappe.connect()
+            record_database_state()
 
-                query_info["explain_result"] = frappe.db.sql(
-                    f"EXPLAIN EXTENDED {query}", as_dict=True
-                )
-
-                if explain_data := query_info["explain_result"]:
-                    # Note: Desk doesn't like Queries with whitespaces in long text for show title in links for forms
-                    # Better to strip them off and format on demand
-                    query_record = record_query(
-                        sql_format(query, strip_whitespace=True, keyword_case="upper")
+            with Pool(NUM_JOBS) as p:
+                for i in range(NUM_JOBS):
+                    p.apply_async(
+                        process_sql_metadata_chunk,
+                        args=(queries[i * CHUNK_SIZE : (i + 1) * CHUNK_SIZE],),
+                        kwds={"site": SITE, "setup": False, "chunk_size": CHUNK_SIZE},
                     )
+                p.close()
+                p.join()
+        else:
+            process_sql_metadata_chunk(queries, SITE, setup=True, chunk_size=CHUNK_SIZE)
 
-                    for explain in explain_data:
-                        # skip Toolbox internal queries
-                        if explain["table"] in TOOLBOX_TABLES:
-                            continue
+        print("Done processing queries")
 
-                        query_record.apply_explain(explain)
-
-                    query_record.save()
-                    sql_count += 1
-
-                elif not query.lower().startswith("insert"):
-                    print(f"Skipping query: {query}")
-
-                print(f"Write Transactions: {frappe.db.transaction_writes}", end="\r")
-
-        print(f"Processed {sql_count} queries" + " " * 5)
-        frappe.db.commit()
         # the following line will delete the queries that have been logged after the processing started too
         delete_recording.callback()
 

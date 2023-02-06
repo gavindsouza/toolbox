@@ -75,3 +75,61 @@ def handle_redis_connection_error():
     except ConnectionError as e:
         secho(f"ERROR: {e}", fg="red")
         secho("NOTE: Make sure Redis services are running", fg="yellow")
+
+
+def process_sql_metadata_chunk(
+    queries: list[str],
+    site: str,
+    setup: bool = True,
+    chunk_size: int = 5_000,
+    auto_commit: bool = True,
+):
+    import frappe
+    from sqlparse import format as sql_format
+
+    with frappe.init_site(site):
+        sql_count = 0
+        granularity = chunk_size // 100
+        frappe.connect()
+
+        TOOLBOX_TABLES = set(frappe.get_all("DocType", {"module": "Toolbox"}, pluck="name"))
+
+        if setup:
+            record_database_state()
+
+        for query in queries:
+            if query.lower().startswith(
+                ("start", "commit", "rollback", "savepoint", "alter", "analyze")
+            ):
+                continue
+
+            explain_data = frappe.db.sql(f"EXPLAIN EXTENDED {query}", as_dict=True)
+
+            if not explain_data:
+                print(f"Cannot explain query: {query}")
+                continue
+
+            # Note: Desk doesn't like Queries with whitespaces in long text for show title in links for forms
+            # Better to strip them off and format on demand
+            query_record = record_query(
+                sql_format(query, strip_whitespace=True, keyword_case="upper")
+            )
+            for explain in explain_data:
+                # skip Toolbox internal queries
+                if explain["table"] not in TOOLBOX_TABLES:
+                    query_record.apply_explain(explain)
+            query_record.save()
+
+            sql_count += 1
+            # Show approximate progress
+            print(
+                f"Processed ~{round(sql_count / granularity) * granularity:,} queries per job"
+                + " " * 5,
+                end="\r",
+            )
+
+            if auto_commit and frappe.db.transaction_writes > chunk_size:
+                frappe.db.commit()
+
+        if auto_commit:
+            frappe.db.commit()
