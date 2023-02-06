@@ -8,6 +8,7 @@ from frappe.model.document import Document
 class MariaDBTable(Document):
     ...
     # TODO:
+    # analyze table
     # 1. Show table size (MiB)
     # 2. Show table indexes / index size (MiB)
     # 3. Show table health status / fragmentation
@@ -21,12 +22,11 @@ class MariaDBTable(Document):
         queries = frappe.get_all(
             "MariaDB Query",
             filters={"table": self.name},
-            fields=["*"],
+            fields=["*", "name as query"],
             order_by="occurence desc",
+            update={"doctype": "MariaDB Query Candidate"},
         )
         self.set("queries", queries)
-        for qry in self.queries:
-            qry.doctype = "MariaDB Query"
 
     @property
     def num_queries(self):

@@ -45,3 +45,11 @@ class MariaDBQuery(Document):
             "query_explain",
             explain_row | {"rows": cint(explain["rows"]), "filtered": explain.get("filtered")},
         )
+
+    def optimize(self):
+        # 1. Check if the tables involved are scanning entire tables (type: ALL) [Worst case]
+        # 2. If so, check if there are any indexes that can be used
+        # 3. If so, create a new query with the indexes
+        # 4. compare # of rows scanned and filtered
+
+        self.get("query_explain", {"type": "ALL"})

@@ -2,6 +2,11 @@
 # bench --site business.localhost execute frappe.recorder.export_data
 # changed `save 30 100` in redis_cache from `save ""` to persist data
 
+# TODO:
+# 1. Build a more performant recorder that doesn't add so much overhead:
+# defer explain & formatting to processing step. check warnings, extended
+#  on explain too
+
 import click
 from frappe.commands import get_site, pass_context
 
@@ -22,6 +27,7 @@ def delete_recording(context):
 def process_sql_metadata(context):
     import frappe
     from frappe.recorder import export_data
+    from sqlparse import format as sql_format
 
     from toolbox.utils import (
         check_dbms_compatibility,
@@ -48,8 +54,16 @@ def process_sql_metadata(context):
                 if query.lower().startswith(("start", "commit", "rollback")):
                     continue
 
+                query_info["explain_result"] = frappe.db.sql(
+                    f"EXPLAIN EXTENDED {query}", as_dict=True
+                )
+
                 if explain_data := query_info["explain_result"]:
-                    query_record = record_query(query)
+                    # Note: Desk doesn't like Queries with whitespaces in long text for show title in links for forms
+                    # Better to strip them off and format on demand
+                    query_record = record_query(
+                        sql_format(query, strip_whitespace=True, keyword_case="upper")
+                    )
 
                     for explain in explain_data:
                         # skip Toolbox internal queries
@@ -61,10 +75,8 @@ def process_sql_metadata(context):
                     query_record.save()
                     sql_count += 1
 
-                else:
-                    if not query.lower().startswith("insert"):
-                        print(f"Skipping query: {query}")
-                    continue
+                elif not query.lower().startswith("insert"):
+                    print(f"Skipping query: {query}")
 
             print(f"Write Transactions: {frappe.db.transaction_writes}", end="\r")
 
