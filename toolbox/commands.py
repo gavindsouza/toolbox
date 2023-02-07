@@ -18,8 +18,9 @@ def delete_recording(context):
 
 
 @click.command("process-sql-metadata")
+@click.option("--chunk-size", default=2500, help="Number of queries to process in a single job")
 @pass_context
-def process_sql_metadata(context):
+def process_sql_metadata(context, chunk_size: int = 2500):
     from math import ceil
 
     import frappe
@@ -33,7 +34,7 @@ def process_sql_metadata(context):
         record_database_state,
     )
 
-    CHUNK_SIZE = 2500
+    CHUNK_SIZE = chunk_size or 2500
     SITE = get_site(context)
 
     with frappe.init_site(SITE), check_dbms_compatibility(
@@ -103,4 +104,15 @@ def cleanup_sql_metadata(context):
             frappe.db.commit()
 
 
-commands = [process_sql_metadata, delete_recording, cleanup_sql_metadata]
+@click.command("reduce-sql-metadata")
+@pass_context
+def reduce_sql_metadata(context):
+    """Reduce the number of MariaDB Query documents by combining queries that are similar
+
+    We can use levenstein distance to find similar queries, and then combine them into a single document
+
+    """
+    raise NotImplementedError
+
+
+commands = [process_sql_metadata, delete_recording, cleanup_sql_metadata, reduce_sql_metadata]
