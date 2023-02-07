@@ -2,11 +2,6 @@
 # bench --site business.localhost execute frappe.recorder.export_data
 # changed `save 30 100` in redis_cache from `save ""` to persist data
 
-# TODO:
-# 1. Build a more performant recorder that doesn't add so much overhead:
-# defer explain & formatting to processing step. check warnings, extended
-#  on explain too
-
 import click
 from frappe.commands import get_site, pass_context
 

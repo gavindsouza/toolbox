@@ -33,7 +33,7 @@ INDEX_QUERY = dedent(
         INDEX_TYPE index_type,
         CARDINALITY cardinality,
         COLLATION collation,
-        CONCAT(TABLE_NAME, '--', INDEX_NAME) name,
+        CONCAT(INDEX_NAME, '--', TABLE_NAME) name,
         "Administrator" owner,
         "Administrator" modified_by,
         NULL creation,
@@ -62,7 +62,7 @@ class MariaDBIndex(Document):
         ...
 
     def load_from_db(self):
-        table, index = self.name.split("--")
+        index, table = self.name.split("--")
         document_data = frappe.db.sql(
             f"{INDEX_QUERY} WHERE TABLE_NAME = %s AND INDEX_NAME = %s",
             (table, index),
@@ -95,7 +95,7 @@ class MariaDBIndex(Document):
     @staticmethod
     def get_count(args=None, **kwargs):
         args = get_args(args, **kwargs)
-        query = get_index_query(["count(*)"], args["filters"])
+        query = get_index_query(["count(distinct name)"], args["filters"])
         return frappe.db.sql(query)[0][0]
 
 

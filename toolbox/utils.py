@@ -103,6 +103,7 @@ def process_sql_metadata_chunk(
             ):
                 continue
 
+            # should check warnings too? unsure at this point
             explain_data = frappe.db.sql(f"EXPLAIN EXTENDED {query}", as_dict=True)
 
             if not explain_data:

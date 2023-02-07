@@ -19,15 +19,29 @@ class MariaDBTable(Document):
         self.load_queries()
 
     def load_queries(self):
-        queries = frappe.get_all(
+        _queries = frappe.get_all(
             "MariaDB Query",
             filters={"table": self.name},
             fields=["*", "name as query"],
             order_by="occurence desc",
             update={"doctype": "MariaDB Query Candidate"},
         )
-        self.set("queries", queries)
+        if frappe.request:
+            self.set("queries", _queries[:100])
+            self.num_queries = len(_queries)
+        else:
+            self.set("queries", _queries)
 
     @property
     def num_queries(self):
-        return len(self.queries)
+        if (_computed := getattr(self, "_num_queries", None)) is None:
+            return len(self.queries)
+        return _computed
+
+    @num_queries.setter
+    def num_queries(self, value):
+        self._num_queries = value
+
+    @frappe.whitelist()
+    def analyze(self):
+        return frappe.db.sql(f"ANALYZE TABLE `{self._table_name}`")
