@@ -98,9 +98,7 @@ def process_sql_metadata_chunk(
             record_database_state()
 
         for query in queries:
-            if query.lower().startswith(
-                ("start", "commit", "rollback", "savepoint", "alter", "analyze")
-            ):
+            if not query.lower().startswith(("select", "insert", "update", "delete")):
                 continue
 
             # should check warnings too? unsure at this point
