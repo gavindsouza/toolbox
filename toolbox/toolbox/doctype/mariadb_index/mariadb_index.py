@@ -117,7 +117,13 @@ def get_filter_clause(filters: list[list]) -> str:
     if not filters:
         return ""
 
-    return f"""WHERE {' AND '.join(f"{get_column_name(f[1])} {f[2]} {wrap_query_constant(f[3])}" for f in filters)}"""
+    where_clause = []
+
+    for f in filters:
+        i = len(f) - 3
+        where_clause.append(f"{get_column_name(f[i])} {f[i+1]} {wrap_query_constant(f[i+2])}")
+
+    return f"WHERE {' AND '.join(where_clause)}"
 
 
 def get_accessible_fields(fields: list[str]) -> list[str]:
@@ -173,5 +179,8 @@ def get_args(args=None, kwargs=None):
         if limit_char in _args:
             _args["page_length"] = _args[limit_char]
             del _args[limit_char]
+
+    if isinstance(_args["filters"], dict):
+        _args["filters"] = [[k, *v] for k, v in _args["filters"].items()]
 
     return _args
