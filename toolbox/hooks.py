@@ -6,3 +6,6 @@ app_publisher = "Gavin D'souza"
 app_description = "App to optimize & maintain your sites"
 app_email = "gavin18d@gmail.com"
 app_license = "No license"
+
+before_request = ["toolbox.sql_recorder.before_request"]
+after_request = ["toolbox.sql_recorder.after_request"]
