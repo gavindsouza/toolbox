@@ -1,0 +1,26 @@
+{
+ "add_total_row": 0,
+ "columns": [],
+ "creation": "2023-02-09 10:52:52.457488",
+ "disabled": 0,
+ "docstatus": 0,
+ "doctype": "Report",
+ "filters": [],
+ "idx": 0,
+ "is_standard": "Yes",
+ "modified": "2023-02-09 11:14:37.417893",
+ "modified_by": "Administrator",
+ "module": "Toolbox",
+ "name": "Unused MariaDB Indexes",
+ "owner": "Administrator",
+ "prepared_report": 0,
+ "query": "SELECT \n    st.TABLE_NAME 'TABLE_NAME:150', \n    mtbl.name 'MariaDB Table:Link/MariaDB Table:150', \n    st.INDEX_NAME 'INDEX_NAME:150', \n    CONCAT(st.INDEX_NAME, '--', st.COLUMN_NAME, '--', st.TABLE_NAME) 'MariaDB Index:Link/MariaDB Index:300'\n\nFROM \n    information_schema.STATISTICS st\n    LEFT JOIN information_schema.INDEX_STATISTICS idx\n    ON  \n        idx.INDEX_NAME    = st.INDEX_NAME\n        AND idx.TABLE_NAME    = st.TABLE_NAME\n        AND idx.TABLE_SCHEMA  = st.TABLE_SCHEMA\n        \n    LEFT JOIN `tabMariaDB Table` mtbl\n    ON\n        st.TABLE_NAME = mtbl._table_name\n\nWHERE\n    (idx.INDEX_NAME IS NULL OR idx.ROWS_READ = 0)\n    AND st.NON_UNIQUE = 1\n\nORDER BY \n    1, 2, 3",
+ "ref_doctype": "MariaDB Index",
+ "report_name": "Unused MariaDB Indexes",
+ "report_type": "Query Report",
+ "roles": [
+  {
+   "role": "System Manager"
+  }
+ ]
+}
