@@ -1,32 +1,64 @@
-# bench --site business.localhost start-recording
-# bench --site business.localhost execute frappe.recorder.export_data
-# changed `save 30 100` in redis_cache from `save ""` to persist data
+# Available commands:
+# bench --site e.localhost sql-profiler start
+# bench --site e.localhost sql-profiler stop
+# bench --site e.localhost sql-profiler process
+# bench --site e.localhost sql-profiler drop
+# bench --site e.localhost sql-profiler optimize
+
+# Note: changed `save 30 100` in redis_cache from `save ""` to persist data over bench restarts
 
 import click
 from frappe.commands import get_site, pass_context
 
 
-@click.command("delete-recording")
+@click.group("sql-profiler")
+def sql_profiler():
+    ...
+
+
+@click.command("start")
 @pass_context
-def delete_recording(context):
+def start_recording(context):
     import frappe
-    from frappe.recorder import delete
+
+    from toolbox.sql_recorder import TOOLBOX_RECORDER_FLAG
 
     with frappe.init_site(get_site(context)):
-        frappe.connect()
-        delete()
+        frappe.cache().set_value(TOOLBOX_RECORDER_FLAG, 1)
 
 
-@click.command("process-sql-metadata")
+@click.command("stop")
+@pass_context
+def stop_recording(context):
+    import frappe
+
+    from toolbox.sql_recorder import TOOLBOX_RECORDER_FLAG
+
+    with frappe.init_site(get_site(context)):
+        frappe.cache().delete_value(TOOLBOX_RECORDER_FLAG)
+
+
+@click.command("drop")
+@pass_context
+def drop_recording(context):
+    import frappe
+
+    from toolbox.sql_recorder import delete_data
+
+    with frappe.init_site(get_site(context)):
+        delete_data()
+
+
+@click.command("process")
 @click.option("--chunk-size", default=2500, help="Number of queries to process in a single job")
 @pass_context
-def process_sql_metadata(context, chunk_size: int = 2500):
+def process_metadata(context, chunk_size: int = 2500):
     from math import ceil
 
     import frappe
-    from frappe.recorder import export_data
     from frappe.utils.synchronization import filelock
 
+    from toolbox.sql_recorder import TOOLBOX_RECORDER_FLAG, export_data
     from toolbox.utils import (
         check_dbms_compatibility,
         handle_redis_connection_error,
@@ -40,11 +72,9 @@ def process_sql_metadata(context, chunk_size: int = 2500):
     with frappe.init_site(SITE), check_dbms_compatibility(
         frappe.conf
     ), handle_redis_connection_error(), filelock("process_sql_metadata", timeout=0.1):
-        frappe.set_user("Administrator")
-        # better drop data from redis before processing, & save the list in a file if anything happens
-        queries: list[str] = [
-            query["query"] for func_call in export_data() for query in func_call["calls"]
-        ]
+        # stop recording queries while processing
+        frappe.cache().delete_value(TOOLBOX_RECORDER_FLAG)
+        queries = [query for request_data in export_data() for query in request_data]
 
         NUM_JOBS = 1
         if len(queries) > CHUNK_SIZE:
@@ -70,15 +100,16 @@ def process_sql_metadata(context, chunk_size: int = 2500):
         else:
             process_sql_metadata_chunk(queries, SITE, setup=True, chunk_size=CHUNK_SIZE)
 
-        print("Done processing queries")
+        print("Done processing queries across all jobs")
 
         # the following line will delete the queries that have been logged after the processing started too
-        delete_recording.callback()
+        drop_recording.callback()
+        print("*** SQL Recorder switched off ***")
 
 
-@click.command("cleanup-sql-metadata")
+@click.command("cleanup")
 @pass_context
-def cleanup_sql_metadata(context):
+def cleanup_metadata(context):
     from collections import Counter
 
     import frappe
@@ -104,15 +135,19 @@ def cleanup_sql_metadata(context):
             frappe.db.commit()
 
 
-@click.command("reduce-sql-metadata")
+@click.command("optimize")
 @pass_context
-def reduce_sql_metadata(context):
-    """Reduce the number of MariaDB Query documents by combining queries that are similar
-
-    We can use levenstein distance to find similar queries, and then combine them into a single document
-
-    """
-    raise NotImplementedError
+def optimize_queries(context):
+    ...
 
 
-commands = [process_sql_metadata, delete_recording, cleanup_sql_metadata, reduce_sql_metadata]
+sql_profiler.add_command(start_recording)
+sql_profiler.add_command(stop_recording)
+sql_profiler.add_command(drop_recording)
+
+sql_profiler.add_command(process_metadata)
+sql_profiler.add_command(cleanup_metadata)
+
+sql_profiler.add_command(optimize_queries)
+
+commands = [sql_profiler]
