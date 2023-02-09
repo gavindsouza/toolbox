@@ -34,16 +34,18 @@ def record_table(table: str) -> str:
     return table_id
 
 
-def record_query(query: str) -> "MariaDBQuery":
+def record_query(query: str, p_query: str | None = None) -> "MariaDBQuery":
     import frappe
 
     if query_name := frappe.get_all("MariaDB Query", {"query": query}, limit=1):
         query_record = frappe.get_doc("MariaDB Query", query_name[0])
+        query_record.parameterized_query = p_query
         query_record.occurence += 1
         return query_record
 
     query_record = frappe.new_doc("MariaDB Query")
     query_record.query = query
+    query_record.parameterized_query = p_query
     query_record.occurence = 1
 
     return query_record
@@ -78,7 +80,7 @@ def handle_redis_connection_error():
 
 
 def process_sql_metadata_chunk(
-    queries: list[str],
+    queries: list[dict],
     site: str,
     setup: bool = True,
     chunk_size: int = 5_000,
@@ -97,9 +99,13 @@ def process_sql_metadata_chunk(
         if setup:
             record_database_state()
 
-        for query in queries:
+        for query_info in queries:
+            query: str = query_info["query"]
+
             if not query.lower().startswith(("select", "insert", "update", "delete")):
                 continue
+
+            parameterized_query: str = query_info["args"][0]
 
             # should check warnings too? unsure at this point
             explain_data = frappe.db.sql(f"EXPLAIN EXTENDED {query}", as_dict=True)
@@ -111,7 +117,8 @@ def process_sql_metadata_chunk(
             # Note: Desk doesn't like Queries with whitespaces in long text for show title in links for forms
             # Better to strip them off and format on demand
             query_record = record_query(
-                sql_format(query, strip_whitespace=True, keyword_case="upper")
+                sql_format(query, strip_whitespace=True, keyword_case="upper"),
+                p_query=parameterized_query,
             )
             for explain in explain_data:
                 # skip Toolbox internal queries
