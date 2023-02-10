@@ -46,13 +46,13 @@ def _unpatch():
     frappe.db.sql = frappe.local.db_sql
 
 
-def before_request():
+def before_hook(*args, **kwargs):
     if frappe.cache().get_value(TOOLBOX_RECORDER_FLAG):
         frappe.local.toolbox_recorder = SQLRecorder()
         _patch()
 
 
-def after_request():
+def after_hook(*args, **kwargs):
     if frappe.cache().get_value(TOOLBOX_RECORDER_FLAG):
         frappe.local.toolbox_recorder.dump()
         _unpatch()
