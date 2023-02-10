@@ -3,6 +3,7 @@
 
 frappe.ui.form.on("MariaDB Table", {
 	refresh(frm) {
+        // TODO: CHECK NEED FOR ANALYZE & add optimize button instead?
         frm.add_custom_button(__("Analyze Table"), () => {
             frappe.show_alert(`Analyzing table ${frm.doc._table_name}`);
             frm.call("analyze").then(({ message }) => {

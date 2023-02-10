@@ -11,8 +11,8 @@ import click
 from frappe.commands import get_site, pass_context
 
 
-@click.group("sql-profiler")
-def sql_profiler():
+@click.group("sql-recorder")
+def sql_recorder():
     ...
 
 
@@ -141,13 +141,13 @@ def optimize_queries(context):
     ...
 
 
-sql_profiler.add_command(start_recording)
-sql_profiler.add_command(stop_recording)
-sql_profiler.add_command(drop_recording)
+sql_recorder.add_command(start_recording)
+sql_recorder.add_command(stop_recording)
+sql_recorder.add_command(drop_recording)
 
-sql_profiler.add_command(process_metadata)
-sql_profiler.add_command(cleanup_metadata)
+sql_recorder.add_command(process_metadata)
+sql_recorder.add_command(cleanup_metadata)
 
-sql_profiler.add_command(optimize_queries)
+sql_recorder.add_command(optimize_queries)
 
-commands = [sql_profiler]
+commands = [sql_recorder]

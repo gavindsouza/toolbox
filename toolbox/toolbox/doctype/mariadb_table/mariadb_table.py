@@ -45,3 +45,7 @@ class MariaDBTable(Document):
     @frappe.whitelist()
     def analyze(self):
         return frappe.db.sql(f"ANALYZE TABLE `{self._table_name}`")
+
+    @frappe.whitelist()
+    def optimize(self):
+        return frappe.db.sql(f"OPTIMIZE TABLE `{self._table_name}`")

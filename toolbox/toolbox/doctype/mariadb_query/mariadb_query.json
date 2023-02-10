@@ -53,11 +53,12 @@
   {
    "fieldname": "parameterized_query",
    "fieldtype": "Long Text",
-   "label": "Parameterized Query"
+   "label": "Parameterized Query",
+   "read_only": 1
   }
  ],
  "links": [],
- "modified": "2023-02-09 16:08:31.591107",
+ "modified": "2023-02-10 17:37:56.684348",
  "modified_by": "Administrator",
  "module": "Toolbox",
  "name": "MariaDB Query",

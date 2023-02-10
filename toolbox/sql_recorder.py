@@ -6,8 +6,8 @@ from re import compile
 import frappe
 
 TRACEBACK_PATH_PATTERN = compile(".*/apps/")
-TOOLBOX_RECORDER_FLAG = "toolbox_sql_profiler_enabled"
-TOOLBOX_RECORDER_DATA = "toolbox_sql_profiler_records"
+TOOLBOX_RECORDER_FLAG = "toolbox-sql_recorder-enabled"
+TOOLBOX_RECORDER_DATA = "toolbox-sql_recorder-records"
 
 
 def export_data() -> list[list[dict[str, str | float | list[dict]]]]:
