@@ -142,8 +142,63 @@ def cleanup_metadata(context):
 
 @click.command("optimize")
 @pass_context
-def optimize_queries(context):
-    ...
+def optimize_datbase(context):
+    from itertools import groupby
+
+    import frappe
+
+    from toolbox.doctypes import MariaDBIndex
+    from toolbox.utils import Table
+
+    # 1. Check if the tables involved are scanning entire tables (type: ALL[Worst case] and similar)
+    # 2. If so, check if there are any indexes that can be used - create a new query with the indexes
+    # 3. compare # of rows scanned and filtered and execution time, before and after
+
+    with frappe.init_site(get_site(context)):
+        frappe.connect()
+
+        ok_types = ["ALL", "index", "range", "ref", "eq_ref", "fulltext", "ref_or_null"]
+
+        # TODO: Check if there is any salvageable data in the query explain - like
+        # possible_keys, key_len, filtered (for existing perf & test any improvement, along w query exec time ofcs), etc
+        # TODO: at this point we're skipping queries without WHERE clause in the later steps, but we should consider them too
+        # eg: select `source`, `target` from `tabWebsite Route Redirect`
+
+        queries = frappe.get_all(
+            "MariaDB Query Explain",
+            filters=[
+                ["MariaDB Query Explain", "type", "in", ok_types],
+                ["MariaDB Query Explain", "parenttype", "=", "MariaDB Query"],
+            ],
+            fields=["parent", "table"],
+            order_by=None,
+        )
+        grouped_queries = groupby(queries, lambda x: x.table)
+
+        for table_id, _queries in grouped_queries:
+            table = Table(id=table_id)
+            parameterized_queries = {
+                q.parameterized_query or q.query
+                for q in frappe.get_all(
+                    "MariaDB Query",
+                    filters=[["MariaDB Query", "name", "in", [q.parent for q in _queries]]],
+                    fields=["query", "parameterized_query"],
+                    order_by=None,
+                )
+            }
+            index_candidates = table.find_index_candidates(parameterized_queries)
+            current_indexed_columns = MariaDBIndex.get_list(
+                {"filters": [["table", "=", table.id]], "pluck": "column_name"}
+            )
+
+            for index_candidate in index_candidates:
+                if index_candidate in current_indexed_columns:
+                    continue
+                # TODO: Add something to resolve / reduce to a better index - like if there are multiple columns in the query, create a composite index?
+                # Check if index is already present using MariaDBIndex.{method} instead of the if-in above? dont feel so confident about it at this point
+                MariaDBIndex.create(table.name, index_candidate)
+
+            # TODO: Test perf of new index on queries - no gains unless changes are tested, show results before / after
 
 
 sql_recorder.add_command(start_recording)
@@ -153,6 +208,6 @@ sql_recorder.add_command(drop_recording)
 sql_recorder.add_command(process_metadata)
 sql_recorder.add_command(cleanup_metadata)
 
-sql_recorder.add_command(optimize_queries)
+sql_recorder.add_command(optimize_datbase)
 
 commands = [sql_recorder]

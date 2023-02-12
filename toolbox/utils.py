@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from functools import lru_cache
 from typing import TYPE_CHECKING
 
 from click import secho
@@ -149,3 +150,49 @@ def process_sql_metadata_chunk(
 
         if auto_commit:
             frappe.db.commit()
+
+
+@lru_cache(maxsize=None)
+def get_table_name(table_id: str):
+    # Note: Use this util only via CLI / single threaded
+    import frappe
+
+    return frappe.db.get_value("MariaDB Table", table_id, "_table_name")
+
+
+class Table:
+    def __init__(self, id: str) -> None:
+        self.id = id
+        self.name = get_table_name(self.id)
+
+    def __repr__(self) -> str:
+        return f"Table({self.id})"
+
+    def __str__(self) -> str:
+        return self.name
+
+    def find_index_candidates(self, queries: list[str]):
+        from sqlparse import parse
+        from sqlparse.sql import Comparison, Identifier, Where
+
+        possible_column = []
+
+        for query in queries:
+            for statement in parse(query)[0]:
+                # Only consider queries with WHERE statements
+                # should we index columns which are selected often without a WHERE clause? for later consideration
+                if not isinstance(statement, Where):
+                    continue
+
+                for clause_token in statement.tokens:
+                    if not isinstance(clause_token, Comparison):
+                        continue
+                    # we may want to check type of operators for finding appropriate index types at this stage
+                    for in_token in clause_token.tokens:
+                        if not isinstance(in_token, Identifier):
+                            continue
+
+                        if in_token.get_parent_name() in {None, self.name}:
+                            possible_column.append(in_token.get_name())
+
+        return possible_column

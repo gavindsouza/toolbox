@@ -98,6 +98,10 @@ class MariaDBIndex(Document):
         query = get_index_query(["count(distinct name)"], args["filters"])
         return frappe.db.sql(query)[0][0]
 
+    @staticmethod
+    def create(*args, **kwargs):
+        print(f"STUB: Creating MariaDB Index with args: {args} and kwargs: {kwargs}")
+
 
 def wrap_query_constant(value: str) -> str:
     if isinstance(value, str):
