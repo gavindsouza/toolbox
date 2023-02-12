@@ -74,6 +74,7 @@ def process_metadata(context, chunk_size: int = 2500):
     ), handle_redis_connection_error(), filelock("process_sql_metadata", timeout=0.1):
         # stop recording queries while processing
         frappe.cache().delete_value(TOOLBOX_RECORDER_FLAG)
+        KEEP_RECORDER_ON = frappe.conf.toolbox and frappe.conf.toolbox.get("recorder")
         queries = [query for request_data in export_data() for query in request_data]
 
         NUM_JOBS = 1
@@ -102,9 +103,13 @@ def process_metadata(context, chunk_size: int = 2500):
 
         print("Done processing queries across all jobs")
 
-        # the following line will delete the queries that have been logged after the processing started too
+        if KEEP_RECORDER_ON:
+            with frappe.init_site(SITE):
+                frappe.cache().set_value(TOOLBOX_RECORDER_FLAG, 1)
+        else:
+            print("*** SQL Recorder switched off ***")
+
         drop_recording.callback()
-        print("*** SQL Recorder switched off ***")
 
 
 @click.command("cleanup")

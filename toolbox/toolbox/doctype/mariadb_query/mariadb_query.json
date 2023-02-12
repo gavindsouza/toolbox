@@ -13,7 +13,8 @@
   "improved",
   "occurence",
   "tables",
-  "query_explain"
+  "query_explain",
+  "call_stack"
  ],
  "fields": [
   {
@@ -55,10 +56,16 @@
    "fieldtype": "Long Text",
    "label": "Parameterized Query",
    "read_only": 1
+  },
+  {
+   "fieldname": "call_stack",
+   "fieldtype": "Long Text",
+   "label": "Call Stack",
+   "read_only": 1
   }
  ],
  "links": [],
- "modified": "2023-02-10 17:37:56.684348",
+ "modified": "2023-02-10 18:04:52.930011",
  "modified_by": "Administrator",
  "module": "Toolbox",
  "name": "MariaDB Query",

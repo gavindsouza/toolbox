@@ -34,19 +34,28 @@ def record_table(table: str) -> str:
     return table_id
 
 
-def record_query(query: str, p_query: str | None = None) -> "MariaDBQuery":
+def record_query(
+    query: str, p_query: str | None = None, call_stack: list[dict] | None = None
+) -> "MariaDBQuery":
     import frappe
 
     if query_name := frappe.get_all("MariaDB Query", {"query": query}, limit=1):
         query_record = frappe.get_doc("MariaDB Query", query_name[0])
         query_record.parameterized_query = p_query
         query_record.occurence += 1
+
+        if call_stack:
+            # TODO: Let's just maintain one stack for now
+            # if not query_record.call_stack:
+            query_record.call_stack = frappe.as_json(call_stack)
+
         return query_record
 
     query_record = frappe.new_doc("MariaDB Query")
     query_record.query = query
     query_record.parameterized_query = p_query
     query_record.occurence = 1
+    query_record.call_stack = frappe.as_json(call_stack)
 
     return query_record
 
@@ -119,6 +128,7 @@ def process_sql_metadata_chunk(
             query_record = record_query(
                 sql_format(query, strip_whitespace=True, keyword_case="upper"),
                 p_query=parameterized_query,
+                call_stack=query_info["stack"],
             )
             for explain in explain_data:
                 # skip Toolbox internal queries
