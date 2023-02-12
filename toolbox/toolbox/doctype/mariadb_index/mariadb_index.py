@@ -1,6 +1,7 @@
 # Copyright (c) 2023, Gavin D'souza and contributors
 # For license information, please see license.txt
 
+from itertools import groupby
 from textwrap import dedent
 
 import frappe
@@ -97,6 +98,16 @@ class MariaDBIndex(Document):
         args = get_args(args, **kwargs)
         query = get_index_query(["count(distinct name)"], args["filters"])
         return frappe.db.sql(query)[0][0]
+
+    @staticmethod
+    def get_indexes(table, *, reduce=False):
+        table_indexes = MariaDBIndex.get_list(filters=[["table", "=", table]])
+        if reduce:
+            return [
+                [z["column_name"] for z in y]
+                for _, y in groupby(table_indexes, lambda x: x["key_name"])
+            ]
+        return table_indexes
 
     @staticmethod
     def create(*args, **kwargs):

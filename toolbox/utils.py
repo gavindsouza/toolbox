@@ -171,11 +171,11 @@ class Table:
     def __str__(self) -> str:
         return self.name
 
-    def find_index_candidates(self, queries: list[str]):
+    def find_index_candidates(self, queries: list[str]) -> list[list[str]]:
         from sqlparse import parse
         from sqlparse.sql import Comparison, Identifier, Where
 
-        possible_column = []
+        index_candidates = []
 
         for query in queries:
             for statement in parse(query)[0]:
@@ -187,12 +187,18 @@ class Table:
                 for clause_token in statement.tokens:
                     if not isinstance(clause_token, Comparison):
                         continue
+
+                    query_index_candidate = []
+
                     # we may want to check type of operators for finding appropriate index types at this stage
                     for in_token in clause_token.tokens:
                         if not isinstance(in_token, Identifier):
                             continue
 
                         if in_token.get_parent_name() in {None, self.name}:
-                            possible_column.append(in_token.get_name())
+                            query_index_candidate.append(in_token.get_name())
 
-        return possible_column
+                    if query_index_candidate:
+                        index_candidates.append(query_index_candidate)
+
+        return index_candidates

@@ -39,3 +39,15 @@ class TestMariaDBIndex(FrappeTestCase):
         self.assertDictEqual(last_doc.as_dict(), last_doc_int.as_dict())
         self.assertIsInstance(doc, MariaDBIndex)
         self.assertDictEqual(doc.as_dict(), last_doc.as_dict())
+
+    def test_get_indexes(self):
+        indexes = MariaDBIndex.get_indexes("tabDocType")
+        self.assertTrue(indexes)
+        self.assertIsInstance(indexes, list)
+        self.assertIsInstance(indexes[0], frappe._dict)
+
+        indexes = MariaDBIndex.get_indexes("tabDocType", reduce=True)
+        self.assertTrue(indexes)
+        self.assertIsInstance(indexes, list)
+        self.assertIsInstance(indexes[0], list)
+        self.assertIsInstance(indexes[0][0], str)

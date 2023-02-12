@@ -1,7 +1,7 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from toolbox.utils import record_query, record_table
+from toolbox.utils import Table, record_query, record_table
 
 
 class TestToolBoxUtils(FrappeTestCase):
@@ -25,3 +25,12 @@ class TestToolBoxUtils(FrappeTestCase):
         mqry_again = record_query(query).save()
         self.assertEqual(mqry.name, mqry_again.name)
         self.assertEqual(mqry_again.occurence, 2)
+
+    def test_table_find_index_candidates(self):
+        queries = [
+            "select `name` from `tabNote` where `modified` = `creation` or `creation` > `modified`",
+        ]
+        table_id = frappe.db.get_value("MariaDB Table", {"_table_name": "tabNote"})
+        table = Table(table_id)
+        index_candidates = table.find_index_candidates(queries)
+        self.assertEqual(index_candidates, [["modified", "creation"], ["creation", "modified"]])

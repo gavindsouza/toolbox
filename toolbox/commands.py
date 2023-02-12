@@ -187,16 +187,13 @@ def optimize_datbase(context):
                 )
             }
             index_candidates = table.find_index_candidates(parameterized_queries)
-            current_indexed_columns = MariaDBIndex.get_list(
-                {"filters": [["table", "=", table.id]], "pluck": "column_name"}
-            )
+            current_indexed_columns = MariaDBIndex.get_indexes(table.name, reduce=True)
+            required_indexes = [x for x in index_candidates if x not in current_indexed_columns]
 
-            for index_candidate in index_candidates:
-                if index_candidate in current_indexed_columns:
-                    continue
-                # TODO: Add something to resolve / reduce to a better index - like if there are multiple columns in the query, create a composite index?
-                # Check if index is already present using MariaDBIndex.{method} instead of the if-in above? dont feel so confident about it at this point
-                MariaDBIndex.create(table.name, index_candidate)
+            # TODO: Add something to resolve / reduce to a better index - like if there are multiple columns in the query, create a composite index?
+            # Check if index is already present using MariaDBIndex.{method} instead of the if-in above? dont feel so confident about it at this point
+            if required_indexes:
+                MariaDBIndex.create(table.name, required_indexes)
 
             # TODO: Test perf of new index on queries - no gains unless changes are tested, show results before / after
 
