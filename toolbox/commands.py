@@ -157,35 +157,29 @@ def optimize_datbase(context):
     with frappe.init_site(get_site(context)):
         frappe.connect()
 
-        ok_types = ["ALL", "index", "range", "ref", "eq_ref", "fulltext", "ref_or_null"]
-
         # TODO: Check if there is any salvageable data in the query explain - like
         # possible_keys, key_len, filtered (for existing perf & test any improvement, along w query exec time ofcs), etc
         # TODO: at this point we're skipping queries without WHERE clause in the later steps, but we should consider them too
         # eg: select `source`, `target` from `tabWebsite Route Redirect`
 
+        ok_types = ["ALL", "index", "range", "ref", "eq_ref", "fulltext", "ref_or_null"]
+        table_grouper = lambda q: q.table  # noqa: E731
+
         queries = frappe.get_all(
-            "MariaDB Query Explain",
+            "MariaDB Query",
             filters=[
                 ["MariaDB Query Explain", "type", "in", ok_types],
                 ["MariaDB Query Explain", "parenttype", "=", "MariaDB Query"],
             ],
-            fields=["parent", "table"],
+            fields=["query", "parameterized_query", "query_explain.table"],
             order_by=None,
         )
-        grouped_queries = groupby(queries, lambda x: x.table)
+        queries = sorted(queries, key=table_grouper)  # required for groupby to work
 
-        for table_id, _queries in grouped_queries:
+        for table_id, _queries in groupby(queries, table_grouper):
             table = Table(id=table_id)
-            parameterized_queries = {
-                q.parameterized_query or q.query
-                for q in frappe.get_all(
-                    "MariaDB Query",
-                    filters=[["MariaDB Query", "name", "in", [q.parent for q in _queries]]],
-                    fields=["query", "parameterized_query"],
-                    order_by=None,
-                )
-            }
+            parameterized_queries = {q.parameterized_query or q.query for q in _queries}
+
             index_candidates = table.find_index_candidates(parameterized_queries)
             current_indexed_columns = MariaDBIndex.get_indexes(table.name, reduce=True)
             required_indexes = [x for x in index_candidates if x not in current_indexed_columns]
