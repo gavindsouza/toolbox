@@ -26,7 +26,7 @@ class TestToolBoxUtils(FrappeTestCase):
         self.assertEqual(mqry.name, mqry_again.name)
         self.assertEqual(mqry_again.occurence, 2)
 
-    def test_table_find_index_candidates(self):
+    def test_table_find_index_where_candidates(self):
         queries = [
             "select `name` from `tabNote` where `modified` = `creation` or `creation` > `modified`",
         ]
@@ -34,3 +34,18 @@ class TestToolBoxUtils(FrappeTestCase):
         table = Table(table_id)
         index_candidates = table.find_index_candidates(queries)
         self.assertEqual(index_candidates, [["modified", "creation"], ["creation", "modified"]])
+
+        queries = [
+            "select `name` from `tabNote` where `modified` = `creation` or `creation` > '2023-02-13 13:35:01.556111'",
+        ]
+        index_candidates = table.find_index_candidates(queries)
+        self.assertEqual(index_candidates, [["modified", "creation"], ["creation"]])
+
+    def test_table_find_index_select_candidates(self):
+        queries = [
+            "select `name`, `frequency`, `date`, `weekday` from `tabQuality Goal` order by `tabQuality Goal`.`modified` DESC",
+        ]
+        table_id = frappe.db.get_value("MariaDB Table", {"_table_name": "tabQuality Goal"})
+        table = Table(table_id)
+        index_candidates = table.find_index_candidates(queries)
+        self.assertEqual(index_candidates, [["name", "frequency", "date", "weekday"]])

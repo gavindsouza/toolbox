@@ -3,8 +3,13 @@ from functools import lru_cache
 from typing import TYPE_CHECKING
 
 from click import secho
+from sqlparse import parse
+from sqlparse.sql import Comparison, Identifier, IdentifierList, Where
+from sqlparse.tokens import Keyword, Whitespace, Wildcard
 
 if TYPE_CHECKING:
+    from sqlparse.sql import Statement
+
     from toolbox.doctypes import MariaDBQuery
 
 
@@ -171,34 +176,74 @@ class Table:
     def __str__(self) -> str:
         return self.name
 
-    def find_index_candidates(self, queries: list[str]) -> list[list[str]]:
-        from sqlparse import parse
-        from sqlparse.sql import Comparison, Identifier, Where
+    def exists(self) -> bool:
+        import frappe
 
+        if frappe.db.sql("SHOW TABLES LIKE %s", self.name):
+            return True
+        return False
+
+    def find_index_candidates(self, queries: list[str]) -> list[list[str]]:
         index_candidates = []
 
         for query in queries:
-            for statement in parse(query)[0]:
-                # Only consider queries with WHERE statements
-                # should we index columns which are selected often without a WHERE clause? for later consideration
-                if not isinstance(statement, Where):
-                    continue
+            parsed_query = parse(query)[0]
 
-                for clause_token in statement.tokens:
-                    if not isinstance(clause_token, Comparison):
-                        continue
-
-                    query_index_candidate = []
-
-                    # we may want to check type of operators for finding appropriate index types at this stage
-                    for in_token in clause_token.tokens:
-                        if not isinstance(in_token, Identifier):
-                            continue
-
-                        if in_token.get_parent_name() in {None, self.name}:
-                            query_index_candidate.append(in_token.get_name())
-
-                    if query_index_candidate:
-                        index_candidates.append(query_index_candidate)
+            # TODO: handle subqueries by making this recursive
+            if any(isinstance(token, Where) for token in parsed_query):
+                index_candidates.extend(self.find_index_candidates_from_where_query(parsed_query))
+            else:
+                index_candidates.append(self.find_index_candidates_from_select_query(parsed_query))
 
         return index_candidates
+
+    def find_index_candidates_from_where_query(self, parsed_query: "Statement") -> list[list[str]]:
+        query_index_candidate = []
+
+        for clause_token in parsed_query.tokens:
+            if not isinstance(clause_token, Where):
+                continue
+
+            # we may want to check type of operators for finding appropriate index types at this stage
+            for in_token in clause_token.tokens:
+                if not isinstance(in_token, Comparison):
+                    continue
+
+                index_candidate = []
+                for inner_token in in_token.tokens:
+                    if not isinstance(inner_token, Identifier):
+                        continue
+                    if inner_token.get_parent_name() in {None, self.name}:
+                        index_candidate.append(inner_token.get_name())
+                query_index_candidate.append(index_candidate)
+
+        return query_index_candidate
+
+    def find_index_candidates_from_select_query(self, parsed_query: "Statement") -> list[str]:
+        query_index_candidate = []
+
+        if parsed_query.get_type() != "SELECT":
+            return query_index_candidate
+
+        in_select = False
+
+        for clause_token in parsed_query.tokens:
+            if clause_token.ttype == Whitespace:
+                continue
+
+            if in_select:
+                if clause_token.ttype == Wildcard:
+                    query_index_candidate.append(clause_token.value)
+                elif isinstance(clause_token, Identifier):
+                    query_index_candidate.append(clause_token.get_name())
+                elif isinstance(clause_token, IdentifierList):
+                    query_index_candidate.extend(
+                        identifier.get_name() for identifier in clause_token.get_identifiers()
+                    )
+                elif clause_token.ttype == Keyword and clause_token.value.upper() == "FROM":
+                    in_select = False
+                    break
+            else:
+                in_select = clause_token.value.upper() == "SELECT"
+
+        return query_index_candidate
