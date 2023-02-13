@@ -32,6 +32,13 @@ class MariaDBTable(Document):
         else:
             self.set("queries", _queries)
 
+    def validate(self):
+        self.set_exists_check()
+
+    def set_exists_check(self):
+        if frappe.db.sql("SHOW TABLES LIKE %s", self._table_name):
+            self._table_exists = True
+
     @property
     def num_queries(self):
         if (_computed := getattr(self, "_num_queries", None)) is None:

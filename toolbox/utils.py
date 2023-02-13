@@ -73,7 +73,8 @@ def record_database_state():
         if not frappe.db.exists("MariaDB Table", {"_table_name": tbl}):
             table_record = frappe.new_doc("MariaDB Table")
             table_record._table_name = tbl
-            table_record.insert()
+            table_record._table_exists = True
+            table_record.db_insert()
 
 
 @contextmanager

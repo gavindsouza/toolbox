@@ -7,20 +7,12 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "exists",
+  "_table_exists",
   "num_queries",
   "_table_name",
   "queries"
  ],
  "fields": [
-  {
-   "default": "0",
-   "fieldname": "exists",
-   "fieldtype": "Check",
-   "is_virtual": 1,
-   "label": "Exists",
-   "read_only": 1
-  },
   {
    "fieldname": "_table_name",
    "fieldtype": "Data",
@@ -42,6 +34,13 @@
    "fieldtype": "Int",
    "is_virtual": 1,
    "label": "No. of Queries"
+  },
+  {
+   "default": "0",
+   "fieldname": "_table_exists",
+   "fieldtype": "Check",
+   "label": "Table Exists",
+   "read_only": 1
   }
  ],
  "links": [
@@ -56,7 +55,7 @@
    "table_fieldname": "_table_name"
   }
  ],
- "modified": "2023-01-29 17:27:19.647649",
+ "modified": "2023-02-13 16:36:04.090684",
  "modified_by": "Administrator",
  "module": "Toolbox",
  "name": "MariaDB Table",
