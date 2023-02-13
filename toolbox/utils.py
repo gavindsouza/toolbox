@@ -192,9 +192,15 @@ class Table:
 
             # TODO: handle subqueries by making this recursive
             if any(isinstance(token, Where) for token in parsed_query):
-                index_candidates.extend(self.find_index_candidates_from_where_query(parsed_query))
+                for c in self.find_index_candidates_from_where_query(parsed_query):
+                    if c and c not in index_candidates:
+                        index_candidates.append(c)
             else:
-                index_candidates.append(self.find_index_candidates_from_select_query(parsed_query))
+                temp = []
+                for c in self.find_index_candidates_from_select_query(parsed_query):
+                    if c not in index_candidates:
+                        temp.append(c)
+                index_candidates.append(temp)
 
         return index_candidates
 

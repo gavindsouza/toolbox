@@ -178,8 +178,14 @@ def optimize_datbase(context):
 
         for table_id, _queries in groupby(queries, table_grouper):
             table = Table(id=table_id)
-            parameterized_queries = {q.parameterized_query or q.query for q in _queries}
 
+            if not table.name or not table.exists():
+                # First condition is likely due to ghost data in MariaDB Query Explain  - this might be a bug, or require a cleanup
+                # Second is for derived and temporary tables                            - this is expected
+                print(f"Skipping {table_id} - table not found")
+                continue
+
+            parameterized_queries = {q.parameterized_query or q.query for q in _queries}
             index_candidates = table.find_index_candidates(parameterized_queries)
             current_indexed_columns = MariaDBIndex.get_indexes(table.name, reduce=True)
             required_indexes = [x for x in index_candidates if x not in current_indexed_columns]
