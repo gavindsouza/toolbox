@@ -1,6 +1,6 @@
 from contextlib import contextmanager
 from functools import lru_cache
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from click import secho
 from sqlparse import parse
@@ -166,13 +166,52 @@ def get_table_name(table_id: str):
     return frappe.db.get_value("MariaDB Table", table_id, "_table_name")
 
 
+@lru_cache(maxsize=None)
+def get_table_id(table_name: str):
+    # Note: Use this util only via CLI / single threaded
+    import frappe
+
+    return frappe.db.get_value("MariaDB Table", {"_table_name": table_name}, "name")
+
+
+class Query:
+    def __init__(self, sql: str, occurence: int = 1, table: "Table" = None) -> None:
+        self.sql = sql
+        self.occurence = occurence
+        self.table = table
+
+    def __repr__(self) -> str:
+        sub = f", table={self.table}" if self.table else ""
+        dotted = "..." if len(self.sql) > 11 else ""
+        return f"Query({self.sql[:10]}{dotted}{sub})"
+
+    @property
+    def parsed(self) -> "Statement":
+        if not hasattr(self, "_parsed"):
+            self._parsed = parse(self.sql)[0]
+        return self._parsed
+
+
+class IndexCandidate(list):
+    def __init__(self, query: Query) -> None:
+        self.query = query
+
+    def __repr__(self) -> str:
+        return f"IndexCandidate({self.query.table or 'NOT SPECIFIED'}, {super().__repr__()})"
+
+    def append(self, __object: str) -> None:
+        if __object in self:
+            return
+        return super().append(__object)
+
+
 class Table:
     def __init__(self, id: str) -> None:
         self.id = id
         self.name = get_table_name(self.id)
 
     def __repr__(self) -> str:
-        return f"Table({self.id})"
+        return f"Table({self.name}, name={self.id})"
 
     def __str__(self) -> str:
         return self.name
@@ -184,30 +223,30 @@ class Table:
             return True
         return False
 
-    def find_index_candidates(self, queries: list[str]) -> list[list[str]]:
+    def find_index_candidates(
+        self, queries: list[Query], qualifier: Callable | None = None
+    ) -> list[IndexCandidate]:
         index_candidates = []
 
         for query in queries:
-            parsed_query = parse(query)[0]
+            if qualifier and not qualifier(query):
+                continue
 
             # TODO: handle subqueries by making this recursive
-            if any(isinstance(token, Where) for token in parsed_query):
-                for c in self.find_index_candidates_from_where_query(parsed_query):
+            if any(isinstance(token, Where) for token in query.parsed):
+                for c in self.find_index_candidates_from_where_query(query):
                     if c and c not in index_candidates:
                         index_candidates.append(c)
             else:
-                temp = []
-                for c in self.find_index_candidates_from_select_query(parsed_query):
-                    if c not in index_candidates:
-                        temp.append(c)
-                index_candidates.append(temp)
+                if ic := self.find_index_candidates_from_select_query(query):
+                    index_candidates.append(ic)
 
         return index_candidates
 
-    def find_index_candidates_from_where_query(self, parsed_query: "Statement") -> list[list[str]]:
+    def find_index_candidates_from_where_query(self, query: Query) -> list[IndexCandidate]:
         query_index_candidate = []
 
-        for clause_token in parsed_query.tokens:
+        for clause_token in query.parsed.tokens:
             if not isinstance(clause_token, Where):
                 continue
 
@@ -216,7 +255,7 @@ class Table:
                 if not isinstance(in_token, Comparison):
                     continue
 
-                index_candidate = []
+                index_candidate = IndexCandidate(query=query)
                 for inner_token in in_token.tokens:
                     if not isinstance(inner_token, Identifier):
                         continue
@@ -226,15 +265,15 @@ class Table:
 
         return query_index_candidate
 
-    def find_index_candidates_from_select_query(self, parsed_query: "Statement") -> list[str]:
-        query_index_candidate = []
+    def find_index_candidates_from_select_query(self, query: Query) -> IndexCandidate:
+        query_index_candidate = IndexCandidate(query=query)
 
-        if parsed_query.get_type() != "SELECT":
+        if query.parsed.get_type() != "SELECT":
             return query_index_candidate
 
         in_select = False
 
-        for clause_token in parsed_query.tokens:
+        for clause_token in query.parsed.tokens:
             if clause_token.ttype == Whitespace:
                 continue
 

@@ -1,7 +1,7 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from toolbox.utils import Table, record_query, record_table
+from toolbox.utils import Query, Table, record_query, record_table
 
 
 class TestToolBoxUtils(FrappeTestCase):
@@ -28,7 +28,9 @@ class TestToolBoxUtils(FrappeTestCase):
 
     def test_table_find_index_where_candidates(self):
         queries = [
-            "select `name` from `tabNote` where `modified` = `creation` or `creation` > `modified`",
+            Query(
+                "select `name` from `tabNote` where `modified` = `creation` or `creation` > `modified`"
+            )
         ]
         table_id = frappe.db.get_value("MariaDB Table", {"_table_name": "tabNote"})
         table = Table(table_id)
@@ -36,14 +38,18 @@ class TestToolBoxUtils(FrappeTestCase):
         self.assertEqual(index_candidates, [["modified", "creation"], ["creation", "modified"]])
 
         queries = [
-            "select `name` from `tabNote` where `modified` = `creation` or `creation` > '2023-02-13 13:35:01.556111'",
+            Query(
+                "select `name` from `tabNote` where `modified` = `creation` or `creation` > '2023-02-13 13:35:01.556111'"
+            ),
         ]
         index_candidates = table.find_index_candidates(queries)
         self.assertEqual(index_candidates, [["modified", "creation"], ["creation"]])
 
     def test_table_find_index_select_candidates(self):
         queries = [
-            "select `name`, `frequency`, `date`, `weekday` from `tabQuality Goal` order by `tabQuality Goal`.`modified` DESC",
+            Query(
+                "select `name`, `frequency`, `date`, `weekday` from `tabQuality Goal` order by `tabQuality Goal`.`modified` DESC"
+            ),
         ]
         table_id = frappe.db.get_value("MariaDB Table", {"_table_name": "tabQuality Goal"})
         table = Table(table_id)

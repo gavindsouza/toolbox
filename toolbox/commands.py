@@ -141,52 +141,66 @@ def cleanup_metadata(context):
 
 
 @click.command("optimize")
+@click.option("--sql-occurence", help="Minimum occurence as qualifier for optimization")
+@click.option("--table", help="Optimize SQL for a given table")
 @pass_context
-def optimize_datbase(context):
+def optimize_datbase(context, sql_occurence: int | None, table: str = None):
     from itertools import groupby
 
     import frappe
 
     from toolbox.doctypes import MariaDBIndex
-    from toolbox.utils import Table
+    from toolbox.utils import Query, Table, get_table_id
 
     # 1. Check if the tables involved are scanning entire tables (type: ALL[Worst case] and similar)
     # 2. If so, check if there are any indexes that can be used - create a new query with the indexes
     # 3. compare # of rows scanned and filtered and execution time, before and after
+    # TODO: Check if there is any salvageable data in the query explain - like
+    # possible_keys, key_len, filtered (for existing perf & test any improvement, along w query exec
+    # time ofcs), etc
 
     with frappe.init_site(get_site(context)):
         frappe.connect()
-
-        # TODO: Check if there is any salvageable data in the query explain - like
-        # possible_keys, key_len, filtered (for existing perf & test any improvement, along w query exec time ofcs), etc
-        # TODO: at this point we're skipping queries without WHERE clause in the later steps, but we should consider them too
-        # eg: select `source`, `target` from `tabWebsite Route Redirect`
-
+        # Note: tried pushing occurence filter in query but it seemed to filter everything out so let's
+        # stick to the sql_qualifier lambda for a while
         ok_types = ["ALL", "index", "range", "ref", "eq_ref", "fulltext", "ref_or_null"]
         table_grouper = lambda q: q.table  # noqa: E731
+        sql_qualifier = (lambda q: q.occurence > 50) if sql_occurence else None  # noqa: E731
+        table_specified = (
+            ["MariaDB Query Explain", "table", "=", get_table_id(table)] if table else []
+        )
 
-        queries = frappe.get_all(
+        recorded_queries = frappe.get_all(
             "MariaDB Query",
             filters=[
                 ["MariaDB Query Explain", "type", "in", ok_types],
                 ["MariaDB Query Explain", "parenttype", "=", "MariaDB Query"],
+                table_specified,
             ],
-            fields=["query", "parameterized_query", "query_explain.table"],
+            fields=["query", "parameterized_query", "query_explain.table", "occurence"],
             order_by=None,
+            distinct=True,
         )
-        queries = sorted(queries, key=table_grouper)  # required for groupby to work
+        recorded_queries = sorted(
+            recorded_queries, key=table_grouper
+        )  # required for groupby to work
 
-        for table_id, _queries in groupby(queries, table_grouper):
+        for table_id, _queries in groupby(recorded_queries, key=table_grouper):
             table = Table(id=table_id)
 
             if not table.name or not table.exists():
                 # First condition is likely due to ghost data in MariaDB Query Explain  - this might be a bug, or require a cleanup
                 # Second is for derived and temporary tables                            - this is expected
-                print(f"Skipping {table_id} - table not found")
+                # print(f"Skipping {table_id} - table not found")
                 continue
 
-            parameterized_queries = {q.parameterized_query or q.query for q in _queries}
-            index_candidates = table.find_index_candidates(parameterized_queries)
+            # TODO: Generate Query object so that index creation decisions can be made based
+            # on query occurence, execution times, etc and not just the columns involved
+            table_queries = [
+                Query(*q, table=table)
+                for q in {(q.parameterized_query or q.query, q.occurence) for q in _queries}
+            ]
+            index_candidates = table.find_index_candidates(table_queries, qualifier=sql_qualifier)
             current_indexed_columns = MariaDBIndex.get_indexes(table.name, reduce=True)
             required_indexes = [x for x in index_candidates if x not in current_indexed_columns]
 
