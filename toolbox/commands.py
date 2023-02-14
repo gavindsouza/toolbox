@@ -155,7 +155,7 @@ def optimize_datbase(context, sql_occurence: int | None, table: str = None):
     # 1. Check if the tables involved are scanning entire tables (type: ALL[Worst case] and similar)
     # 2. If so, check if there are any indexes that can be used - create a new query with the indexes
     # 3. compare # of rows scanned and filtered and execution time, before and after
-    # TODO: Check if there is any salvageable data in the query explain - like
+    # TODO: Check if there is any salvageable data in the query explain - like execution time,
     # possible_keys, key_len, filtered (for existing perf & test any improvement, along w query exec
     # time ofcs), etc
 
@@ -191,11 +191,9 @@ def optimize_datbase(context, sql_occurence: int | None, table: str = None):
             if not table.name or not table.exists():
                 # First condition is likely due to ghost data in MariaDB Query Explain  - this might be a bug, or require a cleanup
                 # Second is for derived and temporary tables                            - this is expected
-                # print(f"Skipping {table_id} - table not found")
+                print(f"Skipping {table_id} - table not found")
                 continue
 
-            # TODO: Generate Query object so that index creation decisions can be made based
-            # on query occurence, execution times, etc and not just the columns involved
             table_queries = [
                 Query(*q, table=table)
                 for q in {(q.parameterized_query or q.query, q.occurence) for q in _queries}

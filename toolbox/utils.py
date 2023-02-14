@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+from enum import Enum, auto
 from functools import lru_cache
 from typing import TYPE_CHECKING, Callable
 
@@ -192,12 +193,18 @@ class Query:
         return self._parsed
 
 
+class IndexCandidateType(Enum):
+    SELECT: str = auto()
+    WHERE: str = auto()
+
+
 class IndexCandidate(list):
-    def __init__(self, query: Query) -> None:
+    def __init__(self, query: Query, type: IndexCandidateType) -> None:
         self.query = query
+        self.type = type
 
     def __repr__(self) -> str:
-        return f"IndexCandidate({self.query.table or 'NOT SPECIFIED'}, {super().__repr__()})"
+        return f"IndexCandidate({self.query.table or 'unspecified'}, {super().__repr__()})"
 
     def append(self, __object: str) -> None:
         if __object in self:
@@ -237,9 +244,8 @@ class Table:
                 for c in self.find_index_candidates_from_where_query(query):
                     if c and c not in index_candidates:
                         index_candidates.append(c)
-            else:
-                if ic := self.find_index_candidates_from_select_query(query):
-                    index_candidates.append(ic)
+            elif ic := self.find_index_candidates_from_select_query(query):
+                index_candidates.append(ic)
 
         return index_candidates
 
@@ -255,7 +261,7 @@ class Table:
                 if not isinstance(in_token, Comparison):
                     continue
 
-                index_candidate = IndexCandidate(query=query)
+                index_candidate = IndexCandidate(query=query, type=IndexCandidateType.WHERE)
                 for inner_token in in_token.tokens:
                     if not isinstance(inner_token, Identifier):
                         continue
@@ -266,7 +272,7 @@ class Table:
         return query_index_candidate
 
     def find_index_candidates_from_select_query(self, query: Query) -> IndexCandidate:
-        query_index_candidate = IndexCandidate(query=query)
+        query_index_candidate = IndexCandidate(query=query, type=IndexCandidateType.SELECT)
 
         if query.parsed.get_type() != "SELECT":
             return query_index_candidate
