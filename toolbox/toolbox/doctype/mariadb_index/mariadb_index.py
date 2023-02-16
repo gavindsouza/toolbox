@@ -9,6 +9,8 @@ from frappe.model.document import Document
 
 from toolbox.utils import IndexCandidate
 
+TOOLBOX_INDEX_PREFIX = "toolbox_index_"
+
 FIELD_ALIAS = {
     "name": "name",
     "owner": "owner",
@@ -46,6 +48,10 @@ INDEX_QUERY = dedent(
     ON
         s.TABLE_NAME = f._table_name"""
 )
+
+
+def get_index_name(ic: IndexCandidate) -> str:
+    return f"{TOOLBOX_INDEX_PREFIX}{'_'.join(ic)}"
 
 
 class MariaDBIndexDocument(Document):
@@ -114,12 +120,29 @@ class MariaDBIndex(MariaDBIndexDocument):
         return table_indexes
 
     @staticmethod
-    def create(table, index_candidates: list[IndexCandidate]):
-        print(f"STUB: Creating Index on {table} with candidates: {index_candidates}")
+    def create(table, index_candidates: list[IndexCandidate], verbose=False):
+        for ic in index_candidates:
+            frappe.db.sql_ddl(
+                f"CREATE INDEX `{get_index_name(ic)}` ON `{table}` ({', '.join(ic)})",
+                debug=verbose,
+            )
 
     @staticmethod
-    def drop(table, index_candidates: list[IndexCandidate]):
-        print(f"STUB: Dropping Index on {table} with candidates: {index_candidates}")
+    def drop(table, index_candidates: list[IndexCandidate], verbose=False):
+        for ic in index_candidates:
+            frappe.db.sql_ddl(
+                f"DROP INDEX `{get_index_name(ic)}` ON `{table}`",
+                debug=verbose,
+            )
+
+    @staticmethod
+    def drop_toolbox_indexes(table, verbose=False):
+        for index in MariaDBIndex.get_indexes(table):
+            if index["key_name"].startswith(TOOLBOX_INDEX_PREFIX):
+                frappe.db.sql_ddl(
+                    f"DROP INDEX IF EXISTS `{index['key_name']}` ON `{table}`",
+                    debug=verbose,
+                )
 
 
 def wrap_query_constant(value: str) -> str:

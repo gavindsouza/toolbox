@@ -5,10 +5,11 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Callable
 
 from click import secho
+from sql_metadata import Parser, QueryType
 from sqlparse import format as format_sql
 from sqlparse import parse
-from sqlparse.sql import Comparison, Identifier, IdentifierList, Where
-from sqlparse.tokens import Keyword, Whitespace, Wildcard
+from sqlparse.sql import Comparison, Identifier, Where
+from sqlparse.tokens import Keyword
 
 if TYPE_CHECKING:
     from sqlparse.sql import Statement
@@ -181,7 +182,7 @@ def get_table_id(table_name: str):
 
 class Query:
     def __init__(self, sql: str, occurence: int = 1, table: "Table" = None) -> None:
-        self.sql = sql
+        self.sql = sql.strip()
         self.occurence = occurence
         self.table = table
 
@@ -190,11 +191,19 @@ class Query:
         dotted = "..." if len(self.sql) > 11 else ""
         return f"Query({self.sql[:10]}{dotted}{sub})"
 
+    # Note: We're essentially parsing the same query multiple times
+    # TODO: Avoid this, pass the parsed query to sql-metadata instead (or similar)
     @property
     def parsed(self) -> "Statement":
         if not hasattr(self, "_parsed"):
             self._parsed = parse(self.sql)[0]
         return self._parsed
+
+    @property
+    def d_parsed(self):
+        if not hasattr(self, "_d_parsed"):
+            self._d_parsed = Parser(self.sql)
+        return self._d_parsed
 
     def get_sample(self) -> str:
         ret = self.sql
@@ -265,52 +274,60 @@ class Table:
 
     def find_index_candidates_from_where_query(self, query: Query) -> list[IndexCandidate]:
         query_index_candidate = []
+        ic_operator = "AND"
+        # IndexCandidate generation ruleset:
+        # where A | B | C = [ic(A), ic(B), ic(C)]
+        # where A & B & C = [ic(A, B, C)]
+        # where A & B | C = [ic(A, B), ic(C)]
 
         for clause_token in query.parsed.tokens:
+            # check only the where clause
             if not isinstance(clause_token, Where):
                 continue
 
             # we may want to check type of operators for finding appropriate index types at this stage
             for in_token in clause_token.tokens:
+                if in_token.ttype == Keyword and in_token.value.upper() in {"AND", "OR"}:
+                    ic_operator = in_token.value.upper()
+
                 if not isinstance(in_token, Comparison):
                     continue
 
-                index_candidate = IndexCandidate(query=query, type=IndexCandidateType.WHERE)
+                if ic_operator == "OR":
+                    index_candidate = IndexCandidate(query=query, type=IndexCandidateType.WHERE)
+                else:
+                    index_candidate = (
+                        query_index_candidate[-1]
+                        if query_index_candidate
+                        else IndexCandidate(query=query, type=IndexCandidateType.WHERE)
+                    )
+
                 for inner_token in in_token.tokens:
                     if not isinstance(inner_token, Identifier):
                         continue
                     if inner_token.get_parent_name() in {None, self.name}:
                         index_candidate.append(inner_token.get_name())
-                query_index_candidate.append(index_candidate)
+
+                if index_candidate not in query_index_candidate:
+                    query_index_candidate.append(index_candidate)
 
         return query_index_candidate
 
     def find_index_candidates_from_select_query(self, query: Query) -> IndexCandidate:
         query_index_candidate = IndexCandidate(query=query, type=IndexCandidateType.SELECT)
-
-        if query.parsed.get_type() != "SELECT":
+        if query.d_parsed.query_type != QueryType.SELECT:
             return query_index_candidate
 
-        in_select = False
+        for column in query.d_parsed.columns:
+            if "." in column:
+                tbl, col = column.split(".")
 
-        for clause_token in query.parsed.tokens:
-            if clause_token.ttype == Whitespace:
-                continue
-
-            if in_select:
-                if clause_token.ttype == Wildcard:
-                    query_index_candidate.append(clause_token.value)
-                elif isinstance(clause_token, Identifier):
-                    query_index_candidate.append(clause_token.get_name())
-                elif isinstance(clause_token, IdentifierList):
-                    query_index_candidate.extend(
-                        identifier.get_name() for identifier in clause_token.get_identifiers()
-                    )
-                elif clause_token.ttype == Keyword and clause_token.value.upper() == "FROM":
-                    in_select = False
-                    break
+                if not query.table:
+                    query_index_candidate.append(col)
+                elif tbl == query.table.name:
+                    query_index_candidate.append(col)
             else:
-                in_select = clause_token.value.upper() == "SELECT"
+                query_index_candidate.append(column)
 
         return query_index_candidate
 
@@ -328,8 +345,9 @@ class Table:
 
 
 class QueryBenchmark:
-    def __init__(self, index_candidates: list[IndexCandidate]):
+    def __init__(self, index_candidates: list[IndexCandidate], verbose=False):
         self.index_candidates = index_candidates
+        self.verbose = verbose
         self.before = []
         self.after = []
 
@@ -344,26 +362,57 @@ class QueryBenchmark:
         import frappe
 
         return [
-            frappe.db.sql(f"ANALYZE {ic.query.get_sample()}", as_dict=True)
+            frappe.db.sql(f"ANALYZE {ic.query.get_sample()}", as_dict=True, debug=self.verbose)
             for ic in self.index_candidates
         ]
 
-    def compare_results(self, before: list[list[dict]], after: list[list[dict]]):
-        from frappe.utils import cint
+    def compare_results(
+        self, before: list[list[dict]], after: list[list[dict]]
+    ) -> list[list[dict]]:
+        from collections import defaultdict
 
-        results = {i: {"before": {}, "after": {}} for i in range(len(before))}
+        from frappe.utils import flt
+
+        results = [
+            [{"before": defaultdict(dict), "after": defaultdict(dict)}] * len(before)
+        ] * len(before)
 
         for i, (before_data, after_data) in enumerate(zip(before, after)):
-            for before_row, after_row in zip(before_data, after_data):
+            for j, (before_row, after_row) in enumerate(zip(before_data, after_data)):
                 for key in {"r_rows", "r_filtered", "Extra"}:
-                    results[i]["after"][key] = cint(after_row[key])
-                    results[i]["before"][key] = cint(before_row[key])
+                    results[i][j]["after"][key] = flt(after_row[key])
+                    results[i][j]["before"][key] = flt(before_row[key])
+
+        if self.verbose:
+            print(results)
 
         return results
 
     def get_unchanged_results(self):
-        for q_id, context in self.compare_results(self.before, self.after).items():
-            if context["before"]["r_rows"] <= context["after"]["r_rows"]:
-                yield q_id, context
-            elif context["before"]["r_filtered"] <= context["after"]["r_filtered"]:
+        for q_id, context_table in enumerate(self.compare_results(self.before, self.after)):
+            changes_detected = False
+
+            for row_id, context in enumerate(context_table):
+                # if the number of rows read is the same, then the index is not helping
+                rows_read_changed = context["before"]["r_rows"] != context["after"]["r_rows"]
+
+                # r_filtered relates to how many rows were read and filtered out,
+                # higher the value, better the index - r_filtered = 100 best
+                rows_selectivity_changed = (
+                    context["before"]["r_filtered"] != context["after"]["r_filtered"]
+                )
+
+                # if the number of rows read and the selectivity of the index has not changed, then the index is not helping
+                if not rows_read_changed and not rows_selectivity_changed:
+                    ...
+                # if the selectivity has gotten worse, then the index is not helping
+                elif (
+                    rows_selectivity_changed
+                    and context["before"]["r_filtered"] > context["after"]["r_filtered"]
+                ):
+                    ...
+                else:
+                    changes_detected = True
+
+            if not changes_detected:
                 yield q_id, context

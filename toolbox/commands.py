@@ -144,9 +144,14 @@ def cleanup_metadata(context):
 @click.option("--table", "table_name", help="Optimize SQL for a given table")
 @click.option("--sql-occurence", help="Minimum occurence as qualifier for optimization", type=int)
 @click.option("--skip-backtest", is_flag=True, help="Skip backtesting the query")
+@click.option("--verbose", is_flag=True, help="Increase verbosity of output")
 @pass_context
 def optimize_datbase(
-    context, sql_occurence: int | None, table_name: str = None, skip_backtest: bool = False
+    context,
+    sql_occurence: int | None,
+    table_name: str = None,
+    skip_backtest: bool = False,
+    verbose: bool = False,
 ):
     from collections import defaultdict
     from itertools import groupby
@@ -220,19 +225,27 @@ def optimize_datbase(
             )
             qualified_index_candidates = table.qualify_index_candidates(index_candidates)
 
-            # Generate indexes from qualified index candidates, test gains
-            if skip_backtest:
-                MariaDBIndex.create(table.name, qualified_index_candidates)
+            if not qualified_index_candidates:
+                print(f"No qualified index candidates for {table.name}")
                 continue
 
-            with QueryBenchmark(index_candidates=qualified_index_candidates) as qbm:
-                MariaDBIndex.create(table.name, qualified_index_candidates)
+            # Generate indexes from qualified index candidates, test gains
+            if skip_backtest:
+                MariaDBIndex.create(table.name, qualified_index_candidates, verbose=verbose)
+                continue
+
+            with QueryBenchmark(
+                index_candidates=qualified_index_candidates, verbose=verbose
+            ) as qbm:
+                MariaDBIndex.create(table.name, qualified_index_candidates, verbose=verbose)
 
             # Drop indexes that don't improve query metrics
             redundant_indexes = [
                 qualified_index_candidates[q_id] for q_id, ctx in qbm.get_unchanged_results()
             ]
-            MariaDBIndex.drop(table.name, redundant_indexes)
+            MariaDBIndex.drop(table.name, redundant_indexes, verbose=verbose)
+
+        # TODO: Show summary of changes
 
 
 sql_recorder.add_command(start_recording)

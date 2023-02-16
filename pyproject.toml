@@ -11,6 +11,8 @@ dependencies = [
     # frappe -- https://github.com/frappe/frappe is installed via 'bench init'
 
     # Core dependencies
+    "sqlparse",
+    "sql-metadata",
 ]
 
 [build-system]
