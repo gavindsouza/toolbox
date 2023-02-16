@@ -1,9 +1,11 @@
+import re
 from contextlib import contextmanager
 from enum import Enum, auto
 from functools import lru_cache
 from typing import TYPE_CHECKING, Callable
 
 from click import secho
+from sqlparse import format as format_sql
 from sqlparse import parse
 from sqlparse.sql import Comparison, Identifier, IdentifierList, Where
 from sqlparse.tokens import Keyword, Whitespace, Wildcard
@@ -12,6 +14,8 @@ if TYPE_CHECKING:
     from sqlparse.sql import Statement
 
     from toolbox.doctypes import MariaDBQuery
+
+PARAMS_PATTERN = re.compile(r"\%\([\w]*\)s")
 
 
 def record_table(table: str) -> str:
@@ -192,6 +196,18 @@ class Query:
             self._parsed = parse(self.sql)[0]
         return self._parsed
 
+    def get_sample(self) -> str:
+        ret = self.sql
+
+        if "%s" in self.sql:
+            ret = ret.replace("%s", "1")
+
+        else:
+            for k, v in ((p, "1") for p in PARAMS_PATTERN.findall(self.sql)):
+                ret = ret.replace(k, v)
+
+        return format_sql(ret, strip_whitespace=True, keyword_case="upper")
+
 
 class IndexCandidateType(Enum):
     SELECT: str = auto()
@@ -199,9 +215,9 @@ class IndexCandidateType(Enum):
 
 
 class IndexCandidate(list):
-    def __init__(self, query: Query, type: IndexCandidateType) -> None:
+    def __init__(self, query: Query, type: IndexCandidateType | None = None) -> None:
         self.query = query
-        self.type = type
+        self.type = type or IndexCandidateType.WHERE
 
     def __repr__(self) -> str:
         return f"IndexCandidate({self.query.table or 'unspecified'}, {super().__repr__()})"
@@ -226,9 +242,7 @@ class Table:
     def exists(self) -> bool:
         import frappe
 
-        if frappe.db.sql("SHOW TABLES LIKE %s", self.name):
-            return True
-        return False
+        return bool(frappe.db.sql("SHOW TABLES LIKE %s", self.name))
 
     def find_index_candidates(
         self, queries: list[Query], qualifier: Callable | None = None
@@ -299,3 +313,57 @@ class Table:
                 in_select = clause_token.value.upper() == "SELECT"
 
         return query_index_candidate
+
+    def qualify_index_candidates(self, index_candidates: list[IndexCandidate]):
+        from toolbox.doctypes import MariaDBIndex
+
+        # TODO: Add something to resolve / reduce to a better index -
+        # like if there are multiple columns in the query, create a composite index
+        # * then covering index, etc etc
+
+        current_indexes = MariaDBIndex.get_indexes(self.name, reduce=True)
+        required_indexes = [x for x in index_candidates if x not in current_indexes]
+
+        return required_indexes
+
+
+class QueryBenchmark:
+    def __init__(self, index_candidates: list[IndexCandidate]):
+        self.index_candidates = index_candidates
+        self.before = []
+        self.after = []
+
+    def __enter__(self):
+        self.before = self.conduct_benchmark()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.after = self.conduct_benchmark()
+
+    def conduct_benchmark(self) -> list[list[dict]]:
+        import frappe
+
+        return [
+            frappe.db.sql(f"ANALYZE {ic.query.get_sample()}", as_dict=True)
+            for ic in self.index_candidates
+        ]
+
+    def compare_results(self, before: list[list[dict]], after: list[list[dict]]):
+        from frappe.utils import cint
+
+        results = {i: {"before": {}, "after": {}} for i in range(len(before))}
+
+        for i, (before_data, after_data) in enumerate(zip(before, after)):
+            for before_row, after_row in zip(before_data, after_data):
+                for key in {"r_rows", "r_filtered", "Extra"}:
+                    results[i]["after"][key] = cint(after_row[key])
+                    results[i]["before"][key] = cint(before_row[key])
+
+        return results
+
+    def get_unchanged_results(self):
+        for q_id, context in self.compare_results(self.before, self.after).items():
+            if context["before"]["r_rows"] <= context["after"]["r_rows"]:
+                yield q_id, context
+            elif context["before"]["r_filtered"] <= context["after"]["r_filtered"]:
+                yield q_id, context

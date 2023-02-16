@@ -1,7 +1,7 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from toolbox.utils import Query, Table, record_query, record_table
+from toolbox.utils import IndexCandidate, Query, QueryBenchmark, Table, record_query, record_table
 
 
 class TestToolBoxUtils(FrappeTestCase):
@@ -55,3 +55,20 @@ class TestToolBoxUtils(FrappeTestCase):
         table = Table(table_id)
         index_candidates = table.find_index_candidates(queries)
         self.assertEqual(index_candidates, [["name", "frequency", "date", "weekday"]])
+
+    def test_query_benchmark_no_changes(self):
+        index_candidates = [
+            IndexCandidate(query=Query(qry))
+            for qry in (
+                "SELECT 1",
+                "SELECT `name` from `tabNote`",
+            )
+        ]
+
+        with QueryBenchmark(index_candidates=index_candidates) as qbm:
+            ...
+        results = dict(qbm.get_unchanged_results())
+
+        self.assertEqual(len(results), 2)
+        for _, data in results.items():
+            self.assertDictEqual(data["before"], data["after"])

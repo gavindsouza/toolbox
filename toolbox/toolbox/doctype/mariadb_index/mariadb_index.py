@@ -7,6 +7,8 @@ from textwrap import dedent
 import frappe
 from frappe.model.document import Document
 
+from toolbox.utils import IndexCandidate
+
 FIELD_ALIAS = {
     "name": "name",
     "owner": "owner",
@@ -46,7 +48,7 @@ INDEX_QUERY = dedent(
 )
 
 
-class MariaDBIndex(Document):
+class MariaDBIndexDocument(Document):
     _table_fieldnames = {}
 
     def db_insert(self, *args, **kwargs):
@@ -99,6 +101,8 @@ class MariaDBIndex(Document):
         query = get_index_query(["count(distinct name)"], args["filters"])
         return frappe.db.sql(query)[0][0]
 
+
+class MariaDBIndex(MariaDBIndexDocument):
     @staticmethod
     def get_indexes(table, *, reduce=False):
         table_indexes = MariaDBIndex.get_list(filters=[["table", "=", table]])
@@ -110,8 +114,12 @@ class MariaDBIndex(Document):
         return table_indexes
 
     @staticmethod
-    def create(*args, **kwargs):
-        print(f"STUB: Creating MariaDB Index with args: {args} and kwargs: {kwargs}")
+    def create(table, index_candidates: list[IndexCandidate]):
+        print(f"STUB: Creating Index on {table} with candidates: {index_candidates}")
+
+    @staticmethod
+    def drop(table, index_candidates: list[IndexCandidate]):
+        print(f"STUB: Dropping Index on {table} with candidates: {index_candidates}")
 
 
 def wrap_query_constant(value: str) -> str:

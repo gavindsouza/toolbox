@@ -141,33 +141,44 @@ def cleanup_metadata(context):
 
 
 @click.command("optimize")
-@click.option("--sql-occurence", help="Minimum occurence as qualifier for optimization")
-@click.option("--table", help="Optimize SQL for a given table")
+@click.option("--table", "table_name", help="Optimize SQL for a given table")
+@click.option("--sql-occurence", help="Minimum occurence as qualifier for optimization", type=int)
+@click.option("--skip-backtest", is_flag=True, help="Skip backtesting the query")
 @pass_context
-def optimize_datbase(context, sql_occurence: int | None, table: str = None):
+def optimize_datbase(
+    context, sql_occurence: int | None, table_name: str = None, skip_backtest: bool = False
+):
+    from collections import defaultdict
     from itertools import groupby
 
     import frappe
 
     from toolbox.doctypes import MariaDBIndex
-    from toolbox.utils import Query, Table, get_table_id
+    from toolbox.utils import Query, QueryBenchmark, Table, get_table_id
 
+    # optimization algorithm v1:
     # 1. Check if the tables involved are scanning entire tables (type: ALL[Worst case] and similar)
     # 2. If so, check if there are any indexes that can be used - create a new query with the indexes
     # 3. compare # of rows scanned and filtered and execution time, before and after
+    #
     # TODO: Check if there is any salvageable data in the query explain - like execution time,
     # possible_keys, key_len, filtered (for existing perf & test any improvement, along w query exec
     # time ofcs), etc
+    #
+    # TODO: Add logging to the process
 
     with frappe.init_site(get_site(context)):
         frappe.connect()
-        # Note: tried pushing occurence filter in query but it seemed to filter everything out so let's
-        # stick to the sql_qualifier lambda for a while
+        # Note: don't push occurence filter in SQL without considering that we're storing captured queries
+        # and not candidates. The Query objects here represent query candidates which are reduced considering
+        # parameterized queries and occurences
         ok_types = ["ALL", "index", "range", "ref", "eq_ref", "fulltext", "ref_or_null"]
         table_grouper = lambda q: q.table  # noqa: E731
-        sql_qualifier = (lambda q: q.occurence > 50) if sql_occurence else None  # noqa: E731
+        sql_qualifier = (
+            (lambda q: q.occurence > sql_occurence) if sql_occurence else None
+        )  # noqa: E731
         table_specified = (
-            ["MariaDB Query Explain", "table", "=", get_table_id(table)] if table else []
+            ["MariaDB Query Explain", "table", "=", get_table_id(table_name)] if table_name else []
         )
 
         recorded_queries = frappe.get_all(
@@ -194,20 +205,34 @@ def optimize_datbase(context, sql_occurence: int | None, table: str = None):
                 print(f"Skipping {table_id} - table not found")
                 continue
 
-            table_queries = [
-                Query(*q, table=table)
-                for q in {(q.parameterized_query or q.query, q.occurence) for q in _queries}
+            # combine occurences from parameterized query candidates
+            _qrys = list(_queries)
+            _query_candidates = defaultdict(lambda: 0)
+            for q in _qrys:
+                _query_candidates[q.parameterized_query or q.query] += q.occurence
+
+            query_candidates = [Query(*q, table=table) for q in _query_candidates.items()]
+            del _query_candidates
+
+            # generate index candidates from the query candidates, qualify them
+            index_candidates = table.find_index_candidates(
+                query_candidates, qualifier=sql_qualifier
+            )
+            qualified_index_candidates = table.qualify_index_candidates(index_candidates)
+
+            # Generate indexes from qualified index candidates, test gains
+            if skip_backtest:
+                MariaDBIndex.create(table.name, qualified_index_candidates)
+                continue
+
+            with QueryBenchmark(index_candidates=qualified_index_candidates) as qbm:
+                MariaDBIndex.create(table.name, qualified_index_candidates)
+
+            # Drop indexes that don't improve query metrics
+            redundant_indexes = [
+                qualified_index_candidates[q_id] for q_id, ctx in qbm.get_unchanged_results()
             ]
-            index_candidates = table.find_index_candidates(table_queries, qualifier=sql_qualifier)
-            current_indexed_columns = MariaDBIndex.get_indexes(table.name, reduce=True)
-            required_indexes = [x for x in index_candidates if x not in current_indexed_columns]
-
-            # TODO: Add something to resolve / reduce to a better index - like if there are multiple columns in the query, create a composite index?
-            # Check if index is already present using MariaDBIndex.{method} instead of the if-in above? dont feel so confident about it at this point
-            if required_indexes:
-                MariaDBIndex.create(table.name, required_indexes)
-
-            # TODO: Test perf of new index on queries - no gains unless changes are tested, show results before / after
+            MariaDBIndex.drop(table.name, redundant_indexes)
 
 
 sql_recorder.add_command(start_recording)
