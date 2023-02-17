@@ -146,12 +146,15 @@ class MariaDBIndex(MariaDBIndexDocument):
 
     @staticmethod
     def drop_toolbox_indexes(table, verbose=False):
+        dropped_indexes = set()
         for index in MariaDBIndex.get_indexes(table):
-            if index["key_name"].startswith(TOOLBOX_INDEX_PREFIX):
+            index_name = index["key_name"]
+            if index_name.startswith(TOOLBOX_INDEX_PREFIX) and index_name not in dropped_indexes:
                 frappe.db.sql_ddl(
-                    f"DROP INDEX IF EXISTS `{index['key_name']}` ON `{table}`",
+                    f"DROP INDEX IF EXISTS `{index_name}` ON `{table}`",
                     debug=verbose,
                 )
+                dropped_indexes.add(index_name)
 
 
 def wrap_query_constant(value: str) -> str:

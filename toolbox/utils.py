@@ -1,14 +1,17 @@
 import re
+from collections import defaultdict
 from contextlib import contextmanager
 from enum import Enum, auto
 from functools import lru_cache
+from html import escape
 from typing import TYPE_CHECKING, Callable
 
 from click import secho
+from redis.exceptions import ConnectionError
 from sql_metadata import Parser, QueryType
 from sqlparse import format as format_sql
 from sqlparse import parse
-from sqlparse.sql import Comparison, Identifier, Where
+from sqlparse.sql import Comparison, Identifier, IdentifierList, Where
 from sqlparse.tokens import Keyword
 
 if TYPE_CHECKING:
@@ -20,8 +23,6 @@ PARAMS_PATTERN = re.compile(r"\%\([\w]*\)s")
 
 
 def record_table(table: str) -> str:
-    from html import escape
-
     import frappe
 
     table = table or "NULL"
@@ -92,8 +93,6 @@ def check_dbms_compatibility(conf):
 
 @contextmanager
 def handle_redis_connection_error():
-    from redis.exceptions import ConnectionError
-
     try:
         yield
     except ConnectionError as e:
@@ -109,7 +108,6 @@ def process_sql_metadata_chunk(
     auto_commit: bool = True,
 ):
     import frappe
-    from sqlparse import format as sql_format
 
     with frappe.init_site(site):
         sql_count = 0
@@ -139,7 +137,7 @@ def process_sql_metadata_chunk(
             # Note: Desk doesn't like Queries with whitespaces in long text for show title in links for forms
             # Better to strip them off and format on demand
             query_record = record_query(
-                sql_format(query, strip_whitespace=True, keyword_case="upper"),
+                format_sql(query, strip_whitespace=True, keyword_case="upper"),
                 p_query=parameterized_query,
                 call_stack=query_info["stack"],
             )
@@ -221,12 +219,16 @@ class Query:
 class IndexCandidateType(Enum):
     SELECT: str = auto()
     WHERE: str = auto()
+    ORDER_BY: str = auto()
 
 
 class IndexCandidate(list):
-    def __init__(self, query: Query, type: IndexCandidateType | None = None) -> None:
+    def __init__(
+        self, query: Query, type: IndexCandidateType | None = None, ctx: list | None = None
+    ) -> None:
         self.query = query
         self.type = type or IndexCandidateType.WHERE
+        self.ctx = ctx
 
     def __repr__(self) -> str:
         return f"IndexCandidate({self.query.table or 'unspecified'}, {super().__repr__()})"
@@ -262,28 +264,37 @@ class Table:
             if qualifier and not qualifier(query):
                 continue
 
-            # TODO: handle subqueries by making this recursive
             if any(isinstance(token, Where) for token in query.parsed):
-                for c in self.find_index_candidates_from_where_query(query):
-                    if c and c not in index_candidates:
-                        index_candidates.append(c)
-            elif ic := self.find_index_candidates_from_select_query(query):
-                index_candidates.append(ic)
+                index_generator = self.find_index_candidates_from_where_query
+            else:
+                index_generator = self.find_index_candidates_from_select_query
+
+            for c in index_generator(query):
+                if c and c not in index_candidates:
+                    index_candidates.append(c)
 
         return index_candidates
 
     def find_index_candidates_from_where_query(self, query: Query) -> list[IndexCandidate]:
         query_index_candidate = []
         ic_operator = "AND"
-        # IndexCandidate generation ruleset:
-        # where A | B | C = [ic(A), ic(B), ic(C)]
-        # where A & B & C = [ic(A, B, C)]
-        # where A & B | C = [ic(A, B), ic(C)]
+        parsed_where = False
 
         for clause_token in query.parsed.tokens:
+            # check order by clause for index candidates
+            if parsed_where and not clause_token.ttype:
+                ic = IndexCandidate(query=query, type=IndexCandidateType.ORDER_BY)
+                if isinstance(clause_token, Identifier):
+                    ic.append(clause_token.get_name())
+                elif isinstance(clause_token, IdentifierList):
+                    ic.extend([x.get_name() for x in clause_token.get_identifiers()])
+                query_index_candidate.append(ic)
+                continue
+
             # check only the where clause
             if not isinstance(clause_token, Where):
                 continue
+            parsed_where = True
 
             # we may want to check type of operators for finding appropriate index types at this stage
             for in_token in clause_token.tokens:
@@ -302,6 +313,9 @@ class Table:
                         else IndexCandidate(query=query, type=IndexCandidateType.WHERE)
                     )
 
+                # Store comparison context for qualifying ICs later
+                index_candidate.ctx = [t for t in in_token.tokens if not t.is_whitespace]
+
                 for inner_token in in_token.tokens:
                     if not isinstance(inner_token, Identifier):
                         continue
@@ -313,33 +327,69 @@ class Table:
 
         return query_index_candidate
 
-    def find_index_candidates_from_select_query(self, query: Query) -> IndexCandidate:
-        query_index_candidate = IndexCandidate(query=query, type=IndexCandidateType.SELECT)
+    def find_index_candidates_from_select_query(self, query: Query) -> list[IndexCandidate]:
+        query_index_candidates = []
+
         if query.d_parsed.query_type != QueryType.SELECT:
-            return query_index_candidate
+            return query_index_candidates
 
-        for column in query.d_parsed.columns:
-            if "." in column:
-                tbl, col = column.split(".")
+        ic = {
+            "select": IndexCandidate(query=query, type=IndexCandidateType.SELECT),
+            "order_by": IndexCandidate(query=query, type=IndexCandidateType.ORDER_BY),
+        }
 
-                if not query.table:
-                    query_index_candidate.append(col)
-                elif tbl == query.table.name:
-                    query_index_candidate.append(col)
-            else:
-                query_index_candidate.append(column)
+        for type in {"select", "order_by"}:
+            for column in (query.d_parsed.columns_dict or {}).get(type, []):
+                q_index_candidate = ic[type]
 
-        return query_index_candidate
+                if "." in column:
+                    tbl, col = column.split(".")
+
+                    if not query.table:
+                        q_index_candidate.append(col)
+                    elif tbl == query.table.name:
+                        q_index_candidate.append(col)
+                else:
+                    q_index_candidate.append(column)
+
+                if q_index_candidate:
+                    query_index_candidates.append(q_index_candidate)
+
+        return query_index_candidates
 
     def qualify_index_candidates(self, index_candidates: list[IndexCandidate]):
         from toolbox.doctypes import MariaDBIndex
 
-        # TODO: Add something to resolve / reduce to a better index -
-        # like if there are multiple columns in the query, create a composite index
+        # if there are multiple columns in the query, create a composite index
         # * then covering index, etc etc
-
+        # TODO: Treat select ICs as lesser prioity than where ICs - ignore failures in creation of select ICs
+        required_indexes = []
+        index_candidates.sort(key=len, reverse=True)
         current_indexes = MariaDBIndex.get_indexes(self.name, reduce=True)
-        required_indexes = [x for x in index_candidates if x not in current_indexes]
+
+        for ic in index_candidates:
+            # skip ic if over 5 columns - too many columns in an index is bad
+            if len(ic) > 5:
+                continue
+
+            # skip ic if relevant index already exists
+            if ic in current_indexes:
+                continue
+
+            # skip ic if duplicate, similar
+            for x in required_indexes:
+                ic_set = set(ic)
+                x_set = set(x)
+
+                # if A > const() B = const(), keep ic(B, A) and remove ic(A, B)
+                if ic_set == x_set:
+                    # TODO: check ic.ctx
+                    ...
+                # if ic(A, B, C) is in the list, remove ic(A, B), ic(A, C) & other permutations
+                elif ic_set.issubset(x_set):
+                    continue
+
+            required_indexes.append(ic)
 
         return required_indexes
 
@@ -369,8 +419,6 @@ class QueryBenchmark:
     def compare_results(
         self, before: list[list[dict]], after: list[list[dict]]
     ) -> list[list[dict]]:
-        from collections import defaultdict
-
         from frappe.utils import flt
 
         results = [

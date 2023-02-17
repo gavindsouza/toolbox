@@ -43,34 +43,35 @@ class TestToolBoxUtils(FrappeTestCase):
             ),
         ]
         index_candidates = table.find_index_candidates(queries)
-        self.assertEqual(index_candidates, [["modified", "creation"], ["creation"]])
+        self.assertEqual(index_candidates, [["modified", "creation"], ["creation"], ["title"]])
 
     def test_table_find_index_select_candidates(self):
         table_id = frappe.db.get_value("MariaDB Table", {"_table_name": "tabQuality Goal"})
         table = Table(table_id)
 
-        q_1 = Query(
-            "select `name`, `frequency`, `date`, `weekday` from `tabQuality Goal` order by `tabQuality Goal`.`modified` DESC",
-            table=table,
+        q_1_ic = table.find_index_candidates(
+            [
+                Query(
+                    "select `name`, `frequency`, `date`, `weekday` from `tabQuality Goal` order by `tabQuality Goal`.`modified` DESC",
+                    table=table,
+                ),
+            ]
         )
-        ic_1 = IndexCandidate(query=q_1)
-        ic_1_columnset = ["name", "frequency", "date", "weekday", "modified"]
-        ic_1.extend(ic_1_columnset)
+        assert ["name", "frequency", "date", "weekday"] in q_1_ic
+        assert ["modified"] in q_1_ic
+        assert len(q_1_ic) == 2
 
-        q_2 = Query(
-            "select `name` as `aliased_name` from `tabQuality Goal` order by `tabQuality Goal`.`modified` DESC",
-            table=table,
+        q_2_ic = table.find_index_candidates(
+            [
+                Query(
+                    "select `name` as `aliased_name` from `tabQuality Goal` order by `tabQuality Goal`.`modified` DESC",
+                    table=table,
+                ),
+            ]
         )
-        ic_2 = IndexCandidate(query=q_2)
-        ic_2_columnset = ["name", "modified"]
-        ic_2.extend(ic_2_columnset)
-
-        index_candidates = table.find_index_candidates([q_1, q_2])
-
-        self.assertEqual(index_candidates[0], ic_1)
-        self.assertEqual(index_candidates[0], ic_1_columnset)
-        self.assertEqual(index_candidates[1], ic_2)
-        self.assertEqual(index_candidates[1], ic_2_columnset)
+        assert ["name"] in q_2_ic
+        assert ["modified"] in q_2_ic
+        assert len(q_2_ic) == 2
 
     def test_query_benchmark_no_changes(self):
         index_candidates = [
