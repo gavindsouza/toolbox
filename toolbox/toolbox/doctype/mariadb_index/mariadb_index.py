@@ -25,6 +25,7 @@ FIELD_ALIAS = {
     "cardinality": "CARDINALITY",
     "collation": "COLLATION",
     "frappe_table_id": "f.`name`",
+    "seq_id": "SEQ_IN_INDEX",
 }
 
 INDEX_QUERY = dedent(
@@ -33,6 +34,7 @@ INDEX_QUERY = dedent(
         TABLE_NAME `table`,
         f.name `frappe_table_id`,
         INDEX_NAME key_name,
+        SEQ_IN_INDEX seq_id,
         COLUMN_NAME column_name,
         NON_UNIQUE non_unique,
         INDEX_TYPE index_type,
@@ -112,11 +114,18 @@ class MariaDBIndex(MariaDBIndexDocument):
     @staticmethod
     def get_indexes(table, *, reduce=False):
         table_indexes = MariaDBIndex.get_list(filters=[["table", "=", table]])
+
         if reduce:
             return [
-                [z["column_name"] for z in y]
-                for _, y in groupby(table_indexes, lambda x: x["key_name"])
+                [x["column_name"] for x in index]
+                for index in (
+                    sorted(y, key=lambda x: x["seq_id"])
+                    for _, y in groupby(
+                        sorted(table_indexes, key=lambda x: x["key_name"]), lambda x: x["key_name"]
+                    )
+                )
             ]
+
         return table_indexes
 
     @staticmethod

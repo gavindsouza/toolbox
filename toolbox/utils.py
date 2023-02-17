@@ -383,9 +383,6 @@ class QueryBenchmark:
                     results[i][j]["after"][key] = flt(after_row[key])
                     results[i][j]["before"][key] = flt(before_row[key])
 
-        if self.verbose:
-            print(results)
-
         return results
 
     def get_unchanged_results(self):
