@@ -345,7 +345,7 @@ class Table:
                 if "." in column:
                     tbl, col = column.split(".")
 
-                    if not query.table:
+                    if not query.table or not query.table.name:
                         q_index_candidate.append(col)
                     elif tbl == query.table.name:
                         q_index_candidate.append(col)

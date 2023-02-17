@@ -46,31 +46,33 @@ class TestToolBoxUtils(FrappeTestCase):
         self.assertEqual(index_candidates, [["modified", "creation"], ["creation"], ["title"]])
 
     def test_table_find_index_select_candidates(self):
-        table_id = frappe.db.get_value("MariaDB Table", {"_table_name": "tabQuality Goal"})
-        table = Table(table_id)
+        table = Table(None)
+        table.name = (
+            "tabQuality Goal Non Existent Table"  # this table does not exist on the database
+        )
 
         q_1_ic = table.find_index_candidates(
             [
                 Query(
-                    "select `name`, `frequency`, `date`, `weekday` from `tabQuality Goal` order by `tabQuality Goal`.`modified` DESC",
+                    f"select `name`, `frequency`, `date`, `weekday` from `{table.name}` order by `{table.name}`.`modified` DESC",
                     table=table,
                 ),
             ]
         )
-        assert ["name", "frequency", "date", "weekday"] in q_1_ic
-        assert ["modified"] in q_1_ic
+        self.assertIn(["name", "frequency", "date", "weekday"], q_1_ic)
+        self.assertIn(["modified"], q_1_ic)
         assert len(q_1_ic) == 2
 
         q_2_ic = table.find_index_candidates(
             [
                 Query(
-                    "select `name` as `aliased_name` from `tabQuality Goal` order by `tabQuality Goal`.`modified` DESC",
+                    f"select `name` as `aliased_name` from `{table.name}` order by `{table.name}`.`modified` DESC",
                     table=table,
                 ),
             ]
         )
-        assert ["name"] in q_2_ic
-        assert ["modified"] in q_2_ic
+        self.assertIn(["name"], q_2_ic)
+        self.assertIn(["modified"], q_2_ic)
         assert len(q_2_ic) == 2
 
     def test_query_benchmark_no_changes(self):
