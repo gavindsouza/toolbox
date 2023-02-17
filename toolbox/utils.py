@@ -1,6 +1,6 @@
 import re
 from collections import defaultdict
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from enum import Enum, auto
 from functools import lru_cache
 from html import escape
@@ -377,19 +377,25 @@ class Table:
                 continue
 
             # skip ic if duplicate, similar
+            similar_index_found = False
+
             for x in required_indexes:
                 ic_set = set(ic)
                 x_set = set(x)
 
+                if similar_index_found:
+                    break
+
+                # TODO: check ic.ctx and retain the better suited IC / mark them as similar for now
                 # if A > const() B = const(), keep ic(B, A) and remove ic(A, B)
                 if ic_set == x_set:
-                    # TODO: check ic.ctx
-                    ...
+                    similar_index_found = True
                 # if ic(A, B, C) is in the list, remove ic(A, B), ic(A, C) & other permutations
                 elif ic_set.issubset(x_set):
-                    continue
+                    similar_index_found = True
 
-            required_indexes.append(ic)
+            if not similar_index_found:
+                required_indexes.append(ic)
 
         return required_indexes
 
@@ -419,7 +425,10 @@ class QueryBenchmark:
     def compare_results(
         self, before: list[list[dict]], after: list[list[dict]]
     ) -> list[list[dict]]:
-        from frappe.utils import flt
+        def wrap(value):
+            with suppress(Exception):
+                return float(value)
+            return value
 
         results = [
             [{"before": defaultdict(dict), "after": defaultdict(dict)}] * len(before)
@@ -428,8 +437,8 @@ class QueryBenchmark:
         for i, (before_data, after_data) in enumerate(zip(before, after)):
             for j, (before_row, after_row) in enumerate(zip(before_data, after_data)):
                 for key in {"r_rows", "r_filtered", "Extra"}:
-                    results[i][j]["after"][key] = flt(after_row[key])
-                    results[i][j]["before"][key] = flt(before_row[key])
+                    results[i][j]["after"][key] = wrap(after_row[key])
+                    results[i][j]["before"][key] = wrap(before_row[key])
 
         return results
 

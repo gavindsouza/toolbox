@@ -129,12 +129,19 @@ class MariaDBIndex(MariaDBIndexDocument):
         return table_indexes
 
     @staticmethod
-    def create(table, index_candidates: list[IndexCandidate], verbose=False):
+    def create(
+        table, index_candidates: list[IndexCandidate], verbose=False
+    ) -> list[IndexCandidate]:
+        failures = []
         for ic in index_candidates:
-            frappe.db.sql_ddl(
-                f"CREATE INDEX `{get_index_name(ic)}` ON `{table}` ({', '.join(ic)})",
-                debug=verbose,
-            )
+            try:
+                frappe.db.sql_ddl(
+                    f"CREATE INDEX `{get_index_name(ic)}` ON `{table}` ({', '.join(ic)})",
+                    debug=verbose,
+                )
+            except Exception:
+                failures.append(ic)
+        return failures
 
     @staticmethod
     def drop(table, index_candidates: list[IndexCandidate], verbose=False):

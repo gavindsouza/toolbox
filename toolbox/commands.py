@@ -146,7 +146,7 @@ def cleanup_metadata(context):
 @click.option("--skip-backtest", is_flag=True, help="Skip backtesting the query")
 @click.option("--verbose", is_flag=True, help="Increase verbosity of output")
 @pass_context
-def optimize_datbase(
+def optimize_indexes(
     context,
     sql_occurence: int | None,
     table_name: str = None,
@@ -231,17 +231,23 @@ def optimize_datbase(
 
             # Generate indexes from qualified index candidates, test gains
             if skip_backtest:
-                MariaDBIndex.create(table.name, qualified_index_candidates, verbose=verbose)
+                failed_ics = MariaDBIndex.create(
+                    table.name, qualified_index_candidates, verbose=verbose
+                )
                 continue
 
             with QueryBenchmark(
                 index_candidates=qualified_index_candidates, verbose=verbose
             ) as qbm:
-                MariaDBIndex.create(table.name, qualified_index_candidates, verbose=verbose)
+                failed_ics = MariaDBIndex.create(
+                    table.name, qualified_index_candidates, verbose=verbose
+                )
 
             # Drop indexes that don't improve query metrics
             redundant_indexes = [
-                qualified_index_candidates[q_id] for q_id, ctx in qbm.get_unchanged_results()
+                qualified_index_candidates[q_id]
+                for q_id, ctx in qbm.get_unchanged_results()
+                if qualified_index_candidates[q_id] not in failed_ics
             ]
             MariaDBIndex.drop(table.name, redundant_indexes, verbose=verbose)
 
@@ -255,6 +261,6 @@ sql_recorder.add_command(drop_recording)
 sql_recorder.add_command(process_metadata)
 sql_recorder.add_command(cleanup_metadata)
 
-sql_recorder.add_command(optimize_datbase)
+sql_recorder.add_command(optimize_indexes)
 
 commands = [sql_recorder]
