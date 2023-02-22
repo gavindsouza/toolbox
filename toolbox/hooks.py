@@ -15,6 +15,8 @@ after_job = ["toolbox.sql_recorder.after_hook", "toolbox.doctype_flow.dump"]
 
 doc_events = {
     "*": {
-        "on_update": "toolbox.doctype_flow.document_hook",
+        "before_insert": "toolbox.doctype_flow.start",
+        "before_validate": "toolbox.doctype_flow.start",
+        "on_change": "toolbox.doctype_flow.stop",
     }
 }

@@ -44,7 +44,10 @@ def append_call_stack(doc, key):
     frappe.local.doctype_flow[key].append(doc.doctype)
 
 
-def document_hook(doc, event, **kwargs):
+def start(doc, event, **kwargs):
+    if doc.flags.flow_started:
+        return
+
     doctype = getattr(doc, "doctype", None) or kwargs.get("doctype")
     in_flow_recording = getattr(frappe.local, "in_flow_recording", None)
 
@@ -53,6 +56,17 @@ def document_hook(doc, event, **kwargs):
 
     elif frappe.cache().sismember(TOOLBOX_FLOW_SET, doctype):
         frappe.local.in_flow_recording = doctype
+        append_call_stack(doc, key=doctype)
+
+    doc.flags.flow_started = True
+
+
+def stop(doc, event, **kwargs):
+    doctype = getattr(doc, "doctype", None) or kwargs.get("doctype")
+    in_flow_recording = getattr(frappe.local, "in_flow_recording", None)
+
+    if in_flow_recording == doctype:
+        frappe.local.in_flow_recording = None
 
 
 def render():
