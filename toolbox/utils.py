@@ -22,6 +22,12 @@ if TYPE_CHECKING:
 PARAMS_PATTERN = re.compile(r"\%\([\w]*\)s")
 
 
+def wrap(value):
+    with suppress(Exception):
+        return float(value)
+    return value
+
+
 def record_table(table: str) -> str:
     import frappe
 
@@ -425,11 +431,6 @@ class QueryBenchmark:
     def compare_results(
         self, before: list[list[dict]], after: list[list[dict]]
     ) -> list[list[dict]]:
-        def wrap(value):
-            with suppress(Exception):
-                return float(value)
-            return value
-
         results = [
             [{"before": defaultdict(dict), "after": defaultdict(dict)}] * len(before)
         ] * len(before)

@@ -112,10 +112,21 @@ class MariaDBIndexDocument(Document):
 
 class MariaDBIndex(MariaDBIndexDocument):
     @staticmethod
-    def get_indexes(table, *, reduce=False):
-        table_indexes = MariaDBIndex.get_list(filters=[["table", "=", table]])
+    def get_indexes(table=None, *, reduce=False, toolbox_only=False):
+        filters = []
+
+        if toolbox_only:
+            filters.append(["key_name", "like", f"{TOOLBOX_INDEX_PREFIX}%"])
+
+        if table:
+            filters.append(["table", "=", table])
+
+        table_indexes = MariaDBIndex.get_list(filters=filters)
 
         if reduce:
+            if not table:
+                raise ValueError("Table name is required to reduce indexes")
+
             return [
                 [x["column_name"] for x in index]
                 for index in (

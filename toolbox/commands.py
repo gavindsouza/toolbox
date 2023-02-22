@@ -11,8 +11,23 @@ import click
 from frappe.commands import get_site, pass_context
 
 
+@click.group("doctype-manager")
+def doctype_manager_cli():
+    ...
+
+
 @click.group("sql-recorder")
-def sql_recorder():
+def sql_recorder_cli():
+    ...
+
+
+@click.group("index-manager")
+def index_manager_cli():
+    ...
+
+
+@click.group("sql-manager")
+def sql_manager_cli():
     ...
 
 
@@ -140,6 +155,38 @@ def cleanup_metadata(context):
             frappe.db.commit()
 
 
+@click.command("show-toolbox-indexes")
+@pass_context
+def show_toolbox_indexes(context):
+    import frappe
+    from frappe.utils.commands import render_table
+
+    from toolbox.doctypes import MariaDBIndex
+
+    with frappe.init_site(get_site(context)):
+        frappe.connect()
+        ti = MariaDBIndex.get_indexes(toolbox_only=True)
+        if not ti:
+            print("No indexes found")
+            return
+
+        for d in ti:
+            for attr in [
+                "frappe_table_id",
+                "name",
+                "owner",
+                "modified_by",
+                "creation",
+                "modified",
+            ]:
+                del d[attr]
+        ti.sort(key=lambda d: (d["table"], d["seq_id"]))
+
+        headers = ti[0].keys()
+        data = [list(row.values()) for row in ti]
+        render_table([headers] + data)
+
+
 @click.command("optimize")
 @click.option("--table", "table_name", help="Optimize SQL for a given table")
 @click.option("--sql-occurence", help="Minimum occurence as qualifier for optimization", type=int)
@@ -254,13 +301,14 @@ def optimize_indexes(
         # TODO: Show summary of changes
 
 
-sql_recorder.add_command(start_recording)
-sql_recorder.add_command(stop_recording)
-sql_recorder.add_command(drop_recording)
+sql_recorder_cli.add_command(start_recording)
+sql_recorder_cli.add_command(stop_recording)
+sql_recorder_cli.add_command(drop_recording)
 
-sql_recorder.add_command(process_metadata)
-sql_recorder.add_command(cleanup_metadata)
+index_manager_cli.add_command(show_toolbox_indexes)
+index_manager_cli.add_command(optimize_indexes)
 
-sql_recorder.add_command(optimize_indexes)
+sql_manager_cli.add_command(process_metadata)
+sql_manager_cli.add_command(cleanup_metadata)
 
-commands = [sql_recorder]
+commands = [sql_recorder_cli, index_manager_cli, sql_manager_cli, doctype_manager_cli]
