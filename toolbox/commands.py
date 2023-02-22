@@ -301,6 +301,34 @@ def optimize_indexes(
         # TODO: Show summary of changes
 
 
+@click.command("trace")
+@click.argument("status", type=click.Choice(["on", "off", "status", "purge", "draw"]))
+@click.option("--doctypes", "-d", "doctype_names", help="Add DocTypes to trace list")
+@pass_context
+def trace_doctypes(context, status=str | None, doctype_names: list[str] | None = None):
+    import frappe
+
+    import toolbox.doctype_flow as df
+
+    with frappe.init_site(get_site(context)):
+        frappe.connect()
+        doctypes = [d.strip() for d in (doctype_names or "").split(",") if d.strip()]
+
+        match status:
+            case "on":
+                df.trace(doctypes)
+            case "off":
+                df.untrace(doctypes)
+            case "purge":
+                df.purge(doctypes)
+            case "draw":
+                df.render()
+            case _:
+                print(df.status())
+
+
+doctype_manager_cli.add_command(trace_doctypes)
+
 sql_recorder_cli.add_command(start_recording)
 sql_recorder_cli.add_command(stop_recording)
 sql_recorder_cli.add_command(drop_recording)

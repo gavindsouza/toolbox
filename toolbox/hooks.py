@@ -8,7 +8,13 @@ app_email = "gavin18d@gmail.com"
 app_license = "No license"
 
 before_request = ["toolbox.sql_recorder.before_hook"]
-after_request = ["toolbox.sql_recorder.after_hook"]
+after_request = ["toolbox.sql_recorder.after_hook", "toolbox.doctype_flow.dump"]
 
 before_job = ["toolbox.sql_recorder.before_hook"]
-after_job = ["toolbox.sql_recorder.after_hook"]
+after_job = ["toolbox.sql_recorder.after_hook", "toolbox.doctype_flow.dump"]
+
+doc_events = {
+    "*": {
+        "on_update": "toolbox.doctype_flow.document_hook",
+    }
+}
