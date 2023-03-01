@@ -251,17 +251,16 @@ def optimize_indexes(
         sql_qualifier = (
             (lambda q: q.occurence > sql_occurence) if sql_occurence else None
         )  # noqa: E731
-        table_specified = (
-            ["MariaDB Query Explain", "table", "=", get_table_id(table_name)] if table_name else []
-        )
+        filter_map = [
+            ["MariaDB Query Explain", "type", "in", ok_types],
+            ["MariaDB Query Explain", "parenttype", "=", "MariaDB Query"],
+        ]
+        if table_name:
+            filter_map.append(["MariaDB Query Explain", "table", "=", get_table_id(table_name)])
 
         recorded_queries = frappe.get_all(
             "MariaDB Query",
-            filters=[
-                ["MariaDB Query Explain", "type", "in", ok_types],
-                ["MariaDB Query Explain", "parenttype", "=", "MariaDB Query"],
-                table_specified,
-            ],
+            filters=filter_map,
             fields=["query", "parameterized_query", "query_explain.table", "occurence"],
             order_by=None,
             distinct=True,

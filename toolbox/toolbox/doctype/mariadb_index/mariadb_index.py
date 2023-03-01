@@ -147,7 +147,7 @@ class MariaDBIndex(MariaDBIndexDocument):
         for ic in index_candidates:
             try:
                 frappe.db.sql_ddl(
-                    f"CREATE INDEX `{get_index_name(ic)}` ON `{table}` ({', '.join(ic)})",
+                    f"CREATE INDEX `{get_index_name(ic)}` ON `{table}` ({', '.join(f'`{i}`' for i in ic)})",
                     debug=verbose,
                 )
             except Exception:

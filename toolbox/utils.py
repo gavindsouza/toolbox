@@ -1,5 +1,4 @@
 import re
-from collections import defaultdict
 from contextlib import contextmanager, suppress
 from enum import Enum, auto
 from functools import lru_cache
@@ -431,15 +430,20 @@ class QueryBenchmark:
     def compare_results(
         self, before: list[list[dict]], after: list[list[dict]]
     ) -> list[list[dict]]:
-        results = [
-            [{"before": defaultdict(dict), "after": defaultdict(dict)}] * len(before)
-        ] * len(before)
+        results = [[]] * len(before)
 
         for i, (before_data, after_data) in enumerate(zip(before, after)):
-            for j, (before_row, after_row) in enumerate(zip(before_data, after_data)):
-                for key in {"r_rows", "r_filtered", "Extra"}:
-                    results[i][j]["after"][key] = wrap(after_row[key])
-                    results[i][j]["before"][key] = wrap(before_row[key])
+            for (before_row, after_row) in zip(before_data, after_data):
+                results[i].append(
+                    {
+                        "before": {
+                            key: before_row[key] for key in {"r_rows", "r_filtered", "Extra"}
+                        },
+                        "after": {
+                            key: after_row[key] for key in {"r_rows", "r_filtered", "Extra"}
+                        },
+                    }
+                )
 
         return results
 
