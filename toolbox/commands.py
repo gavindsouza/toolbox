@@ -187,6 +187,28 @@ def show_toolbox_indexes(context):
         render_table([headers] + data)
 
 
+@click.command("drop-toolbox-indexes")
+@click.option("--dry-run", is_flag=True, help="Show indexes that would be dropped")
+@pass_context
+def drop_toolbox_indexes(context, dry_run: bool = False):
+    import frappe
+
+    from toolbox.doctypes import MariaDBIndex
+
+    with frappe.init_site(get_site(context)):
+        frappe.connect()
+        tables = {x["table"] for x in MariaDBIndex.get_indexes(toolbox_only=True)}
+
+        for table in tables:
+            if not dry_run:
+                MariaDBIndex.drop_toolbox_indexes(table)
+
+        if not tables:
+            print("No toolbox indexes found")
+        else:
+            print(f"Dropped indexes for {','.join(tables)}")
+
+
 @click.command("optimize")
 @click.option("--table", "table_name", help="Optimize SQL for a given table")
 @click.option("--sql-occurence", help="Minimum occurence as qualifier for optimization", type=int)
@@ -254,7 +276,8 @@ def optimize_indexes(
             if not table.name or not table.exists():
                 # First condition is likely due to ghost data in MariaDB Query Explain  - this might be a bug, or require a cleanup
                 # Second is for derived and temporary tables                            - this is expected
-                print(f"Skipping {table_id} - table not found")
+                if verbose:
+                    print(f"Skipping {table_id} - table not found")
                 continue
 
             # combine occurences from parameterized query candidates
@@ -273,7 +296,8 @@ def optimize_indexes(
             qualified_index_candidates = table.qualify_index_candidates(index_candidates)
 
             if not qualified_index_candidates:
-                print(f"No qualified index candidates for {table.name}")
+                if verbose:
+                    print(f"No qualified index candidates for {table.name}")
                 continue
 
             # Generate indexes from qualified index candidates, test gains
@@ -334,6 +358,7 @@ sql_recorder_cli.add_command(stop_recording)
 sql_recorder_cli.add_command(drop_recording)
 
 index_manager_cli.add_command(show_toolbox_indexes)
+index_manager_cli.add_command(drop_toolbox_indexes)
 index_manager_cli.add_command(optimize_indexes)
 
 sql_manager_cli.add_command(process_metadata)
