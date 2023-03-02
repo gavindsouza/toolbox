@@ -90,13 +90,13 @@ jobs:
           bench new-site --db-root-password root --admin-password admin test_site
           bench --site test_site install-app toolbox
           bench build
+          bench --site test_site set-config allow_tests true
         env:
           CI: 'Yes'
 
       - name: Run Tests
         working-directory: /home/runner/frappe-bench
         run: |
-          bench --site test_site set-config allow_tests true
           bench --site test_site run-tests --app toolbox
         env:
           TYPE: server
