@@ -292,11 +292,14 @@ def optimize_indexes(
 
             # combine occurences from parameterized query candidates
             _qrys = list(_queries)
-            _query_candidates = defaultdict(lambda: 0)
-            for q in _qrys:
-                _query_candidates[q.parameterized_query or q.query] += q.occurence
+            _query_candidates = defaultdict(lambda: defaultdict(int))
 
-            query_candidates = [Query(*q, table=table) for q in _query_candidates.items()]
+            for q in _qrys:
+                reduced_key = q.parameterized_query or q.query
+                _query_candidates[reduced_key]["sql"] = q.query
+                _query_candidates[reduced_key]["occurence"] += q.occurence
+
+            query_candidates = [Query(**q, table=table) for q in _query_candidates.values()]
             del _query_candidates
 
             # generate index candidates from the query candidates, qualify them
