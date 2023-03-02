@@ -90,12 +90,19 @@ class MariaDBIndexDocument(Document):
     def get_list(args=None, **kwargs):
         args = get_args(args, kwargs)
         order_by = get_mapped_field(args["order_by"]) or "cardinality desc, name"
-        start, page_length = args["start"], args["page_length"]
         fields = get_accessible_fields(args["fields"])
         select_query = get_index_query(fields, args["filters"])
 
+        query = f"{select_query} ORDER BY {order_by}"
+
+        if args.get("start"):
+            query += f" OFFSET {args['start']}"
+
+        if args.get("page_length"):
+            query += f" LIMIT {args['page_length']}"
+
         data = frappe.db.sql(
-            f"{select_query} ORDER BY {order_by} limit {page_length} offset {start}",
+            query,
             as_dict=True,
         )
 
@@ -247,7 +254,7 @@ def get_column_name(fieldname: str) -> str:
 
 
 def get_args(args=None, kwargs=None):
-    _args = {"filters": [], "fields": [], "start": 0, "page_length": 20, "order_by": ""}
+    _args = {"filters": [], "fields": [], "order_by": ""}
     _args.update(args or {})
     _args.update(kwargs or {})
 

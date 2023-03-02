@@ -156,8 +156,9 @@ def cleanup_metadata(context):
 
 
 @click.command("show-toolbox-indexes")
+@click.option("--extra", is_flag=True, help="Show extra columns")
 @pass_context
-def show_toolbox_indexes(context):
+def show_toolbox_indexes(context, extra: bool = False):
     import frappe
     from frappe.utils.commands import render_table
 
@@ -180,7 +181,17 @@ def show_toolbox_indexes(context):
                 "modified",
             ]:
                 del d[attr]
-        ti.sort(key=lambda d: (d["table"], d["seq_id"]))
+
+        if not extra:
+            for d in ti:
+                for attr in [
+                    "non_unique",
+                    "index_type",
+                    "collation",
+                ]:
+                    del d[attr]
+
+        ti.sort(key=lambda d: (d["table"], d["key_name"], d["seq_id"]))
 
         headers = ti[0].keys()
         data = [list(row.values()) for row in ti]
