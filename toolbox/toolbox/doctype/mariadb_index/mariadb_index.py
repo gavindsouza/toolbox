@@ -95,11 +95,11 @@ class MariaDBIndexDocument(Document):
 
         query = f"{select_query} ORDER BY {order_by}"
 
-        if args.get("start"):
-            query += f" OFFSET {args['start']}"
-
         if args.get("page_length"):
             query += f" LIMIT {args['page_length']}"
+
+        if args.get("limit_start"):
+            query += f" OFFSET {args['limit_start']}"
 
         data = frappe.db.sql(
             query,
