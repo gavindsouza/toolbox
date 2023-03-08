@@ -78,15 +78,19 @@ def record_query(
     return query_record
 
 
-def record_database_state():
+def record_database_state(init: bool = False):
     import frappe
 
     for tbl in frappe.db.get_tables(cached=False):
-        if not frappe.db.exists("MariaDB Table", {"_table_name": tbl}):
+        if not init:
+            frappe.get_doc("MariaDB Table", {"_table_name": tbl}).save()
+        elif not frappe.db.exists("MariaDB Table", {"_table_name": tbl}):
             table_record = frappe.new_doc("MariaDB Table")
             table_record._table_name = tbl
             table_record._table_exists = True
             table_record.db_insert()
+
+    frappe.db.commit()
 
 
 @contextmanager
@@ -122,7 +126,7 @@ def process_sql_metadata_chunk(
         TOOLBOX_TABLES = set(frappe.get_all("DocType", {"module": "Toolbox"}, pluck="name"))
 
         if setup:
-            record_database_state()
+            record_database_state(init=True)
 
         for query_info in queries:
             query: str = query_info["query"]
@@ -168,7 +172,7 @@ def process_sql_metadata_chunk(
 
 
 @lru_cache(maxsize=None)
-def get_table_name(table_id: str):
+def get_table_name(table_id: str) -> str | None:
     # Note: Use this util only via CLI / single threaded
     import frappe
 
@@ -362,7 +366,9 @@ class Table:
 
         return query_index_candidates
 
-    def qualify_index_candidates(self, index_candidates: list[IndexCandidate]):
+    def qualify_index_candidates(
+        self, index_candidates: list[IndexCandidate]
+    ) -> list[IndexCandidate]:
         from toolbox.doctypes import MariaDBIndex
 
         # if there are multiple columns in the query, create a composite index

@@ -102,7 +102,7 @@ def process_metadata(context, chunk_size: int = 2500):
             from multiprocessing import Pool
 
             frappe.connect()
-            record_database_state()
+            record_database_state(init=True)
 
             with Pool(NUM_JOBS) as p:
                 for i in range(NUM_JOBS):
@@ -118,11 +118,16 @@ def process_metadata(context, chunk_size: int = 2500):
 
         print("Done processing queries across all jobs")
 
-        if KEEP_RECORDER_ON:
-            with frappe.init_site(SITE):
+        with frappe.init_site(SITE):
+            frappe.connect()
+            record_database_state()
+
+            print("Done recording database state")
+
+            if KEEP_RECORDER_ON:
                 frappe.cache().set_value(TOOLBOX_RECORDER_FLAG, 1)
-        else:
-            print("*** SQL Recorder switched off ***")
+            else:
+                print("*** SQL Recorder switched off ***")
 
         drop_recording.callback()
 

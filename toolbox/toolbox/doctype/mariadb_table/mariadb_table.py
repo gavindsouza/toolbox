@@ -19,7 +19,7 @@ class MariaDBTable(Document):
         self.load_queries()
 
     def load_queries(self):
-        _queries = frappe.get_all(
+        self._all_queries = frappe.get_all(
             "MariaDB Query",
             filters={"table": self.name},
             fields=["*", "name as query"],
@@ -27,13 +27,30 @@ class MariaDBTable(Document):
             update={"doctype": "MariaDB Query Candidate"},
         )
         if frappe.request:
-            self.set("queries", _queries[:100])
-            self.num_queries = len(_queries)
+            self.set("queries", self._all_queries[:100])
+            self.num_queries = len(self._all_queries)
         else:
-            self.set("queries", _queries)
+            self.set("queries", self._all_queries)
 
     def validate(self):
         self.set_exists_check()
+        self.set_table_category()
+
+    def set_table_category(self):
+        all_queries = len(self._all_queries)
+        write_queries = len(
+            [
+                x
+                for x in self._all_queries
+                if x.parameterized_query[:6].lower() in ("update", "insert", "delete")
+            ]
+        )
+
+        if not all_queries or (write_queries / all_queries < 0.5):
+            self.table_category = "Read"
+
+        else:
+            self.table_category = "Write"
 
     def set_exists_check(self):
         if frappe.db.sql("SHOW TABLES LIKE %s", self._table_name):
