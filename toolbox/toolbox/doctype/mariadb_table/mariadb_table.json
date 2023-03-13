@@ -10,6 +10,7 @@
   "_table_exists",
   "num_queries",
   "table_category",
+  "table_category_meta",
   "_table_name",
   "queries"
  ],
@@ -46,8 +47,15 @@
   {
    "fieldname": "table_category",
    "fieldtype": "Select",
+   "in_list_view": 1,
    "label": "Table Category",
    "options": "Read\nWrite"
+  },
+  {
+   "fieldname": "table_category_meta",
+   "fieldtype": "JSON",
+   "label": "Table Category Meta",
+   "read_only": 1
   }
  ],
  "links": [
@@ -62,7 +70,7 @@
    "table_fieldname": "_table_name"
   }
  ],
- "modified": "2023-03-08 11:36:01.386799",
+ "modified": "2023-03-13 13:54:19.781278",
  "modified_by": "Administrator",
  "module": "Toolbox",
  "name": "MariaDB Table",

@@ -1,0 +1,69 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2023-03-04 01:40:42.899891",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "index_manager_section",
+  "is_index_manager_enabled",
+  "sql_recorder_section",
+  "is_sql_recorder_enabled",
+  "sql_recorder_processing_interval"
+ ],
+ "fields": [
+  {
+   "fieldname": "index_manager_section",
+   "fieldtype": "Section Break",
+   "label": "Index Manager"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_index_manager_enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "sql_recorder_section",
+   "fieldtype": "Section Break",
+   "label": "SQL Recorder"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_sql_recorder_enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "sql_recorder_processing_interval",
+   "fieldtype": "Select",
+   "label": "Processing Interval",
+   "options": "Hourly\nDaily"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2023-03-04 02:11:36.431765",
+ "modified_by": "Administrator",
+ "module": "Toolbox",
+ "name": "ToolBox Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -94,9 +94,11 @@ def record_database_state(init: bool = False):
 
 
 @contextmanager
-def check_dbms_compatibility(conf):
+def check_dbms_compatibility(conf, raise_error: bool = False):
     if conf.db_type != "mariadb":
         secho(f"WARN: This command might not be compatible with {conf.db_type}", fg="yellow")
+        if raise_error:
+            raise NotImplementedError(f"Command not compatible with {conf.db_type}")
     yield
 
 
@@ -119,44 +121,61 @@ def process_sql_metadata_chunk(
     import frappe
 
     with frappe.init_site(site):
-        sql_count = 0
-        granularity = chunk_size // 100
         frappe.connect()
+        return _process_sql_metadata_chunk(
+            queries, setup=setup, chunk_size=chunk_size, auto_commit=auto_commit
+        )
 
-        TOOLBOX_TABLES = set(frappe.get_all("DocType", {"module": "Toolbox"}, pluck="name"))
 
-        if setup:
-            record_database_state(init=True)
+def _process_sql_metadata_chunk(
+    queries: list[dict],
+    setup: bool = True,
+    chunk_size: int = 5_000,
+    auto_commit: bool = True,
+    show_progress: bool = False,
+):
+    import frappe
 
-        for query_info in queries:
-            query: str = query_info["query"]
+    sql_count = 0
+    granularity = chunk_size // 100
 
-            if not query.lower().startswith(("select", "insert", "update", "delete")):
-                continue
+    TOOLBOX_TABLES = set(
+        f"tab{x}" for x in frappe.get_all("DocType", {"module": "Toolbox"}, pluck="name")
+    )
 
-            parameterized_query: str = query_info["args"][0]
+    if setup:
+        record_database_state(init=True)
 
-            # should check warnings too? unsure at this point
-            explain_data = frappe.db.sql(f"EXPLAIN EXTENDED {query}", as_dict=True)
+    for query_info in queries:
+        query: str = query_info["query"]
 
-            if not explain_data:
-                print(f"Cannot explain query: {query}")
-                continue
+        if not query.lower().startswith(("select", "insert", "update", "delete")):
+            continue
 
-            # Note: Desk doesn't like Queries with whitespaces in long text for show title in links for forms
-            # Better to strip them off and format on demand
-            query_record = record_query(
-                format_sql(query, strip_whitespace=True, keyword_case="upper"),
-                p_query=parameterized_query,
-                call_stack=query_info["stack"],
-            )
-            for explain in explain_data:
-                # skip Toolbox internal queries
-                if explain["table"] not in TOOLBOX_TABLES:
-                    query_record.apply_explain(explain)
-            query_record.save()
+        parameterized_query: str = query_info["args"][0]
 
-            sql_count += 1
+        # should check warnings too? unsure at this point
+        explain_data = frappe.db.sql(f"EXPLAIN EXTENDED {query}", as_dict=True)
+
+        if not explain_data:
+            print(f"Cannot explain query: {query}")
+            continue
+
+        # Note: Desk doesn't like Queries with whitespaces in long text for show title in links for forms
+        # Better to strip them off and format on demand
+        query_record = record_query(
+            format_sql(query, strip_whitespace=True, keyword_case="upper"),
+            p_query=parameterized_query,
+            call_stack=query_info["stack"],
+        )
+        for explain in explain_data:
+            # skip Toolbox internal queries
+            if explain["table"] not in TOOLBOX_TABLES:
+                query_record.apply_explain(explain)
+        query_record.save()
+
+        sql_count += 1
+        if show_progress:
             # Show approximate progress
             print(
                 f"Processed ~{round(sql_count / granularity) * granularity:,} queries per job"
@@ -164,11 +183,11 @@ def process_sql_metadata_chunk(
                 end="\r",
             )
 
-            if auto_commit and frappe.db.transaction_writes > chunk_size:
-                frappe.db.commit()
-
-        if auto_commit:
+        if auto_commit and frappe.db.transaction_writes > chunk_size:
             frappe.db.commit()
+
+    if auto_commit:
+        frappe.db.commit()
 
 
 @lru_cache(maxsize=None)

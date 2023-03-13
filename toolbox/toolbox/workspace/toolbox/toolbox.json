@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"oZvri3L9DM\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Toolbox</span>\",\"col\":12}},{\"id\":\"f3YRJsrkAS\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"wotZaWJVUQ\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Queries\",\"col\":3}},{\"id\":\"A1vgmEcuNY\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Tables\",\"col\":3}},{\"id\":\"pu4Xty2Zwg\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Indexes\",\"col\":3}},{\"id\":\"a8AZHgw6c_\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"riOeD-B9cl\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Unused Mariadb Indexes\",\"col\":3}}]",
+ "content": "[{\"id\":\"oZvri3L9DM\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Toolbox</span>\",\"col\":12}},{\"id\":\"f3YRJsrkAS\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"wotZaWJVUQ\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Queries\",\"col\":3}},{\"id\":\"A1vgmEcuNY\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Tables\",\"col\":3}},{\"id\":\"pu4Xty2Zwg\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Indexes\",\"col\":3}},{\"id\":\"a8AZHgw6c_\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"riOeD-B9cl\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Unused Mariadb Indexes\",\"col\":3}},{\"id\":\"_9FGn_vOXn\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Index Manager\",\"col\":3}}]",
  "creation": "2023-01-28 12:41:28.998511",
  "docstatus": 0,
  "doctype": "Workspace",
@@ -11,10 +11,11 @@
  "is_hidden": 0,
  "label": "Toolbox",
  "links": [],
- "modified": "2023-02-09 11:29:52.982541",
+ "modified": "2023-03-13 11:48:44.592235",
  "modified_by": "Administrator",
  "module": "Toolbox",
  "name": "Toolbox",
+ "number_cards": [],
  "owner": "Administrator",
  "parent_page": "",
  "public": 1,
@@ -49,6 +50,13 @@
    "label": "Unused Mariadb Indexes",
    "link_to": "Unused MariaDB Indexes",
    "type": "Report"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Index Manager",
+   "link_to": "index-manager",
+   "type": "Page"
   },
   {
    "color": "Grey",

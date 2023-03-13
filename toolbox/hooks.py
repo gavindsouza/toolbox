@@ -20,3 +20,5 @@ doc_events = {
         "on_change": "toolbox.doctype_flow.stop",
     }
 }
+
+boot_session = ["toolbox.overrides.boot_session"]

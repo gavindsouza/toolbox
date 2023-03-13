@@ -51,6 +51,9 @@ class MariaDBTable(Document):
 
         else:
             self.table_category = "Write"
+        self.table_category_meta = frappe.as_json(
+            {"total_queries": all_queries, "write_queries": write_queries}
+        )
 
     def set_exists_check(self):
         if frappe.db.sql("SHOW TABLES LIKE %s", self._table_name):
