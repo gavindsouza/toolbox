@@ -30,9 +30,16 @@ frappe.pages['index-manager'].refresh = async function (wrapper) {
     }
 
     getTables().then(tables => {
-        let chart_card = makeCard({width: '100%' }).appendTo(".page-content").get(0);
-        makeActiveTablesChart(chart_card, tables);
-        makeActiveTablesCard(tables.slice(0, 5)).appendTo(".page-content");
+        let chart_card = makeCard({width: 100 }).appendTo(".page-content").get(0);
+        window.fchart = makeActiveTablesChart(chart_card, tables);
+        // makeActiveTablesCard(tables.slice(0, 5)).appendTo(".page-content");
+    });
+
+    getIndexes(true).then(indexes => {
+        makeCard({
+            title: `<h3>${indexes.total}</h3>`,
+            subtitle: "Indexes created by ToolBox",
+        }).appendTo(".page-content").get(0).innerHTML += `<a href="${frappe.utils.generate_route({type: "doctype", name: "MariaDB Index"})}" class="btn btn-link sm-2">See All -></a>`;
     });
 
     document.querySelector("#page-index-manager > div.container.page-body > div.page-wrapper > div > div.row.layout-main").remove();
@@ -48,8 +55,11 @@ function makeActiveTablesChart(wrapper, tables) {
             ]
         },
         type: 'bar',
-        colors: ['#fc4f51', '#78d6ff', '#7575ff'],
-        barOptions: {'stacked': true}
+        colors: ['green', 'blue'],
+        barOptions: {'stacked': true},
+        title: "Most Active Tables",
+        height: 300,
+        // valuesOverPoints: 1,
     });
 }
 
@@ -74,12 +84,17 @@ async function getTables(limit = 10) {
     return message;
 }
 
+async function getIndexes(toolbox_only = false) {
+    const { message } = await frappe.call({method: "toolbox.api.index_manager.indexes", type: "GET", args: { toolbox_only }});
+    return message;
+}
+
 function makeCard(opts) {
     return $(`<div class="card m-2" style="width: ${opts.width || '18rem'};">
         <div class="card-body">
-            <h5 class="card-title">${opts.title}</h5>
-            <h6 class="card-subtitle mb-2 text-muted">${opts.subtitle}</h6>
-            ${opts.html}
+            ${opts.title ? `<h5 class="card-title">${opts.title}</h5>` : ""}
+            ${opts.subtitle ? `<h6 class="card-subtitle mb-2 text-muted">${opts.subtitle}</h6>` : ""}
+            ${opts.html || ""}
         </div>
         </div>`
     );

@@ -2,6 +2,8 @@ import json
 
 import frappe
 
+from toolbox.doctypes import MariaDBIndex
+
 
 @frappe.whitelist(methods=["GET"])
 def tables(limit: int = 20, offset: int = 0):
@@ -35,3 +37,13 @@ def tables(limit: int = 20, offset: int = 0):
     return sorted(filtered_data, key=lambda x: x["num_queries"], reverse=True)[
         offset : offset + limit
     ]
+
+
+@frappe.whitelist(methods=["GET"])
+def indexes(toolbox_only: bool = True):
+    frappe.has_permission("MariaDB Index", "read", throw=True)
+    toolbox_indexes = MariaDBIndex.get_indexes(toolbox_only=toolbox_only)
+    return {
+        "data": toolbox_indexes,
+        "total": len(toolbox_indexes),
+    }
