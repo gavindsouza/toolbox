@@ -160,7 +160,11 @@ def process_sql_metadata_chunk(
     with frappe.init_site(site):
         frappe.connect()
         return _process_sql_metadata_chunk(
-            queries, setup=setup, chunk_size=chunk_size, auto_commit=auto_commit
+            queries,
+            setup=setup,
+            chunk_size=chunk_size,
+            auto_commit=auto_commit,
+            show_progress=True,
         )
 
 
@@ -222,6 +226,13 @@ def _process_sql_metadata_chunk(
 
         if auto_commit and frappe.db.transaction_writes > chunk_size:
             frappe.db.commit()
+
+    frappe.get_doc(
+        {
+            "doctype": "SQL Record Summary",
+            "sql_count": sql_count,
+        }
+    ).insert()
 
     if auto_commit:
         frappe.db.commit()

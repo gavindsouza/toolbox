@@ -42,7 +42,31 @@ frappe.pages['index-manager'].refresh = async function (wrapper) {
         }).appendTo(".page-content").get(0).innerHTML += `<a href="${frappe.utils.generate_route({type: "doctype", name: "MariaDB Index"})}" class="btn btn-link sm-2">See All -></a>`;
     });
 
+    getSQLStats().then(stats => {
+        let line_chart = makeCard({width: 100 }).appendTo(".page-content").get(0);
+        makeSQLStatsChart(line_chart, stats);
+    });
+
     document.querySelector("#page-index-manager > div.container.page-body > div.page-wrapper > div > div.row.layout-main").remove();
+}
+
+function makeSQLStatsChart(wrapper, stats) {
+    console.log(stats);
+    return new frappe.Chart(wrapper, {
+        data: {
+            'labels':  stats.map(r => r.creation),
+            'datasets': [
+                {'name': 'Queries Recorded', 'values': stats.map(r => r.sql_count)},
+            ]
+        },
+        type: 'line',
+        colors: ['pink'],
+        title: "SQL Queries",
+        height: 300,
+        lineOptions: {
+            regionFill: 1,
+        },
+    });
 }
 
 function makeActiveTablesChart(wrapper, tables) {
@@ -88,6 +112,12 @@ async function getIndexes(toolbox_only = false) {
     const { message } = await frappe.call({method: "toolbox.api.index_manager.indexes", type: "GET", args: { toolbox_only }});
     return message;
 }
+
+async function getSQLStats() {
+    const { message } = await frappe.call({method: "toolbox.api.index_manager.summary", type: "GET"});
+    return message;
+}
+
 
 function makeCard(opts) {
     return $(`<div class="card m-2" style="width: ${opts.width || '18rem'};">

@@ -47,3 +47,12 @@ def indexes(toolbox_only: bool = True):
         "data": toolbox_indexes,
         "total": len(toolbox_indexes),
     }
+
+
+@frappe.whitelist(methods=["GET"])
+def summary():
+    return frappe.get_list(
+        "SQL Record Summary",
+        fields=["*"],
+        order_by="creation",
+    )
