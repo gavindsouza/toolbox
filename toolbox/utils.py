@@ -79,16 +79,53 @@ def record_query(
 
 
 def record_database_state(init: bool = False):
+    import json
+    from itertools import groupby
+
     import frappe
 
-    for tbl in frappe.db.get_tables(cached=False):
-        if not init:
-            frappe.get_doc("MariaDB Table", {"_table_name": tbl}).save()
-        elif not frappe.db.exists("MariaDB Table", {"_table_name": tbl}):
-            table_record = frappe.new_doc("MariaDB Table")
-            table_record._table_name = tbl
-            table_record._table_exists = True
-            table_record.db_insert()
+    if not init:
+        _all_queries = frappe.get_all(
+            "MariaDB Query",
+            fields=["parameterized_query", "`tabMariaDB Query Explain`.table"],
+            order_by="`table`",
+        )
+        for table_id, queries in groupby(_all_queries, lambda x: x["table"]):
+            queries = [q["parameterized_query"] for q in queries]
+            data = {
+                "total_queries": len(queries),
+                "write_queries": len(
+                    [
+                        q
+                        for q in queries
+                        if q.lstrip()[:7]
+                        .upper()
+                        .startswith(
+                            (
+                                QueryType.INSERT,
+                                QueryType.UPDATE,
+                                QueryType.DELETE,
+                            )
+                        )
+                    ]
+                ),
+            }
+            frappe.db.set_value(
+                "MariaDB Table",
+                table_id,
+                "table_category_meta",
+                json.dumps(data),
+                update_modified=False,
+            )
+    else:
+        for tbl in frappe.db.get_tables(cached=False):
+            if not frappe.db.exists("MariaDB Table", {"_table_name": tbl}, cache=True):
+                table_record = frappe.new_doc("MariaDB Table")
+                table_record._table_name = tbl
+                table_record._table_exists = True
+                table_record.db_insert()
+            else:
+                frappe.get_doc("MariaDB Table", {"_table_name": tbl}).save()
 
     frappe.db.commit()
 

@@ -6,7 +6,6 @@ from frappe.model.document import Document
 
 
 class MariaDBTable(Document):
-    ...
     # TODO:
     # analyze table
     # 1. Show table size (MiB)
