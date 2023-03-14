@@ -11,7 +11,7 @@
  "is_hidden": 0,
  "label": "Toolbox",
  "links": [],
- "modified": "2023-03-13 11:48:44.592235",
+ "modified": "2023-03-14 12:56:35.521078",
  "modified_by": "Administrator",
  "module": "Toolbox",
  "name": "Toolbox",
@@ -39,17 +39,17 @@
   {
    "color": "Grey",
    "doc_view": "List",
-   "label": "Indexes",
-   "link_to": "MariaDB Index",
-   "stats_filter": "{\"name\":[\"!=\",\"_xaxaaxaqhedhqhde\"]}",
-   "type": "DocType"
+   "label": "Unused Mariadb Indexes",
+   "link_to": "Unused MariaDB Indexes",
+   "type": "Report"
   },
   {
    "color": "Grey",
    "doc_view": "List",
-   "label": "Unused Mariadb Indexes",
-   "link_to": "Unused MariaDB Indexes",
-   "type": "Report"
+   "label": "Indexes",
+   "link_to": "MariaDB Index",
+   "stats_filter": "{\"name\":[\"is\",\"set\"]}",
+   "type": "DocType"
   },
   {
    "color": "Grey",

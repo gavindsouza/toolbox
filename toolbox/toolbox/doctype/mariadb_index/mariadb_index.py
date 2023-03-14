@@ -266,4 +266,15 @@ def get_args(args=None, kwargs=None):
     if isinstance(_args["filters"], dict):
         _args["filters"] = [[k, *v] for k, v in _args["filters"].items()]
 
+    if isinstance(_args["filters"], list):
+        offset = -1 if _args["filters"] and len(_args["filters"][0]) == 3 else 0
+
+        for f in _args["filters"]:
+            if f[2 + offset] == "is":
+                if f[3 + offset] == "set":
+                    f[2 + offset] = "!="
+                elif f[3 + offset] == "not set":
+                    f[2 + offset] = "="
+                f[3 + offset] = ""
+
     return _args
