@@ -13,6 +13,9 @@ class MariaDBTable(Document):
     # 2. Show table indexes / index size (MiB)
     # 3. Show table health status / fragmentation
     # 5. Show table row count / require partitioning?
+    def __init__(self, *args, **kwargs):
+        self._all_queries = []
+        super().__init__(*args, **kwargs)
 
     def load_from_db(self):
         super().load_from_db()
