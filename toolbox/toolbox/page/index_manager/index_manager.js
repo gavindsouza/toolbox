@@ -22,36 +22,56 @@ frappe.pages['index-manager'].refresh = async function (wrapper) {
         page.main.html(`<div class="text-center" style="margin-top: 100px;">
             <h1>Index Manager</h1>
             <p>Index Manager is disabled</p>
-            <p>Enable it from <a href="${frappe.utils.generate_route({ type: "DocType", name: ToolboxSettings })}">${ToolboxSettings}</a></p>
+            <p>Enable it from
+                <a href="${frappe.utils.generate_route({ type: "DocType", name: ToolboxSettings })}">
+                    ${ToolboxSettings}
+                </a>
+            </p>
         </div>`);
         return;
     } else {
-        page.main.html("");
+        $(page.container.find(".page-content")[0]).empty();
     }
 
-    getTables().then(tables => {
-        let chart_card = makeCard({width: 100 }).appendTo(".page-content").get(0);
-        window.fchart = makeActiveTablesChart(chart_card, tables);
-        // makeActiveTablesCard(tables.slice(0, 5)).appendTo(".page-content");
-    });
+    let indexes = await getIndexes(true);
+    createIndexesShortcut(indexes);
 
-    getIndexes(true).then(indexes => {
-        makeCard({
-            title: `<h3>${indexes.total}</h3>`,
-            subtitle: "Indexes created by ToolBox",
-        }).appendTo(".page-content").get(0).innerHTML += `<a href="${frappe.utils.generate_route({type: "doctype", name: "MariaDB Index"})}" class="btn btn-link sm-2">See All -></a>`;
-    });
+    let tables  = await getTables();
+    createTablesChart(tables);
 
-    getSQLStats().then(stats => {
-        let line_chart = makeCard({width: 100 }).appendTo(".page-content").get(0);
-        makeSQLStatsChart(line_chart, stats);
-    });
+    let sqlStats = await getSQLStats();
+    createSQLStatsChart(sqlStats);
 
-    document.querySelector("#page-index-manager > div.container.page-body > div.page-wrapper > div > div.row.layout-main").remove();
+    document.querySelector(
+        "#page-index-manager > div.container.page-body > div.page-wrapper > div > div.row.layout-main"
+    )?.remove();
+}
+
+function createTablesChart(tables) {
+    let chart_card = makeCard({width: 100, id: "active-tables-chart" }).appendTo(".page-content").get(0);
+    window.fchart = makeActiveTablesChart(chart_card, tables);
+}
+
+function createIndexesShortcut(indexes) {
+    let shortcutCard = makeCard({
+        title: `<h3>${indexes.total}</h3>`,
+        subtitle: "Indexes created by ToolBox",
+        id: "mariadb-indexes-shortcut",
+    }).appendTo(".page-content").get(0);
+
+    shortcutCard.innerHTML += (
+        `<a href="${frappe.utils.generate_route({type: "doctype", name: "MariaDB Index"})}" class="btn btn-link sm-2">
+            See All ->
+        </a>`
+    );
+}
+
+function createSQLStatsChart(sqlStats) {
+    let line_chart = makeCard({width: 100, id: "sql-stats-chart" }).appendTo(".page-content").get(0);
+    makeSQLStatsChart(line_chart, sqlStats);
 }
 
 function makeSQLStatsChart(wrapper, stats) {
-    console.log(stats);
     return new frappe.Chart(wrapper, {
         data: {
             'labels':  stats.map(r => r.creation),
@@ -83,7 +103,6 @@ function makeActiveTablesChart(wrapper, tables) {
         barOptions: {'stacked': true},
         title: "Most Active Tables",
         height: 300,
-        // valuesOverPoints: 1,
     });
 }
 
@@ -120,7 +139,7 @@ async function getSQLStats() {
 
 
 function makeCard(opts) {
-    return $(`<div class="card m-2" style="width: ${opts.width || '18rem'};">
+    return $(`<div class="card m-2" style="width: ${opts.width || '18rem'}; id="${opts.id}"">
         <div class="card-body">
             ${opts.title ? `<h5 class="card-title">${opts.title}</h5>` : ""}
             ${opts.subtitle ? `<h6 class="card-subtitle mb-2 text-muted">${opts.subtitle}</h6>` : ""}
