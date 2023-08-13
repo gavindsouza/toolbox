@@ -4,12 +4,11 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
-from toolbox.utils import record_database_state, record_query
+from toolbox.utils import record_query
 
 
 class TestMariaDBTable(FrappeTestCase):
     def setUp(self) -> None:
-        record_database_state(init=True)
         return super().setUp()
 
     def tearDown(self) -> None:
