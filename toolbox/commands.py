@@ -58,10 +58,10 @@ def stop_recording(context):
 def drop_recording(context):
     import frappe
 
-    from toolbox.sql_recorder import delete_data
+    from toolbox.sql_recorder import TOOLBOX_RECORDER_DATA
 
     with frappe.init_site(get_site(context)):
-        delete_data()
+        frappe.cache.delete_value(TOOLBOX_RECORDER_DATA)
 
 
 @click.command("process")

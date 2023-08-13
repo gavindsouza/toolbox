@@ -1,6 +1,6 @@
 {
  "actions": [],
- "autoname": "hash",
+ "autoname": "autoincrement",
  "creation": "2023-01-28 12:25:24.807743",
  "default_view": "List",
  "doctype": "DocType",
@@ -65,11 +65,11 @@
   }
  ],
  "links": [],
- "modified": "2023-02-10 18:04:52.930011",
+ "modified": "2023-08-13 18:05:36.963098",
  "modified_by": "Administrator",
  "module": "Toolbox",
  "name": "MariaDB Query",
- "naming_rule": "Random",
+ "naming_rule": "Autoincrement",
  "owner": "Administrator",
  "permissions": [
   {

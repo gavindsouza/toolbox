@@ -27,34 +27,35 @@ class ToolBoxSettings(Document):
         for user in frappe.get_all(
             "Has Role", filters={"role": "System Manager"}, pluck="parent", distinct=True
         ):
-            frappe.cache().hdel("bootinfo", user)
+            frappe.cache.hdel("bootinfo", user)
 
     def set_missing_settings(self):
         if self.is_index_manager_enabled:
             self.is_sql_recorder_enabled = True
+            frappe.msgprint(
+                "Index Manager requires SQL Recorder to be enabled. Enabling SQL Recorder.",
+                alert=True,
+            )
         if not self.sql_recorder_processing_interval:
             self.sql_recorder_processing_interval = "Hourly"
 
     def update_scheduled_job(self):
-        if not frappe.db.exists("Scheduled Job Type", "toolbox_settings.process_sql_recorder"):
+        scheduled_job: "ScheduledJobType"
+        try:
+            scheduled_job = frappe.get_doc("Scheduled Job Type", PROCESS_SQL_JOB_METHOD)
+        except frappe.DoesNotExistError:
+            frappe.clear_last_message()
             scheduled_job = frappe.new_doc("Scheduled Job Type")
             scheduled_job.name = PROCESS_SQL_JOB_METHOD
-        else:
-            scheduled_job = frappe.get_doc("Scheduled Job Type", PROCESS_SQL_JOB_METHOD)
 
         scheduled_job.stopped = not self.is_sql_recorder_enabled
         scheduled_job.method = (
             "toolbox.toolbox.doctype.toolbox_settings.toolbox_settings.process_sql_recorder"
         )
         scheduled_job.create_log = 1
+        scheduled_job.frequency = self.sql_recorder_processing_interval + " Long"
 
-        if "*" in self.sql_recorder_processing_interval:
-            scheduled_job.frequency = "Cron"
-            scheduled_job.cron_format = self.sql_recorder_processing_interval
-        else:
-            scheduled_job.frequency = self.sql_recorder_processing_interval + " Long"
-
-        scheduled_job.save()
+        return scheduled_job.save()
 
 
 def process_sql_recorder(chunk_size: int = 100_000):

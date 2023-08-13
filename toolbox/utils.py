@@ -58,19 +58,20 @@ def record_table(table: str) -> str:
     return table_id
 
 
+@request_cache
+def already_recorded(query: str):
+    return frappe.get_all("MariaDB Query", {"query": query}, limit=1)
+
+
 def record_query(
     query: str, p_query: str | None = None, call_stack: list[dict] | None = None
 ) -> "MariaDBQuery":
-    import frappe
-
-    if query_name := frappe.get_all("MariaDB Query", {"query": query}, limit=1):
+    if query_name := already_recorded(query):
         query_record = frappe.get_doc("MariaDB Query", query_name[0])
         query_record.parameterized_query = p_query
-        query_record.occurence += 1
 
+        # Note: Currently not being recorded
         if call_stack:
-            # TODO: Let's just maintain one stack for now
-            # if not query_record.call_stack:
             query_record.call_stack = frappe.as_json(call_stack)
 
         return query_record
@@ -78,17 +79,14 @@ def record_query(
     query_record = frappe.new_doc("MariaDB Query")
     query_record.query = query
     query_record.parameterized_query = p_query
-    query_record.occurence = 1
+    query_record.occurence = 0
     query_record.call_stack = frappe.as_json(call_stack)
 
     return query_record
 
 
 def record_database_state(init: bool = False):
-    import json
-    from itertools import groupby
-
-    import frappe
+    TABLE_DT = "MariaDB Table"
 
     if not init:
         _all_queries = frappe.get_all(
@@ -96,8 +94,8 @@ def record_database_state(init: bool = False):
             fields=["parameterized_query", "`tabMariaDB Query Explain`.table"],
             order_by="`table`",
         )
-        for table_id, queries in groupby(_all_queries, lambda x: x["table"]):
-            queries = [q["parameterized_query"] for q in queries]
+        for table_id, _queries in groupby(_all_queries, lambda x: x["table"]):
+            queries: list[str] = [q["parameterized_query"] for q in _queries]
             data = {
                 "total_queries": len(queries),
                 "write_queries": len(
@@ -116,22 +114,27 @@ def record_database_state(init: bool = False):
                     ]
                 ),
             }
+
             frappe.db.set_value(
-                "MariaDB Table",
+                TABLE_DT,
                 table_id,
                 "table_category_meta",
                 json.dumps(data),
                 update_modified=False,
             )
+
     else:
-        for tbl in frappe.db.get_tables(cached=False):
-            if not frappe.db.exists("MariaDB Table", {"_table_name": tbl}, cache=True):
-                table_record = frappe.new_doc("MariaDB Table")
-                table_record._table_name = tbl
-                table_record._table_exists = True
-                table_record.db_insert()
-            else:
-                frappe.get_doc("MariaDB Table", {"_table_name": tbl}).save()
+        records = [
+            frappe.new_doc(TABLE_DT, _table_name=tbl, _table_exists=True)
+            for tbl in frappe.db.get_tables(cached=False)
+        ]
+
+        if records:
+            bulk_insert(
+                doctype=TABLE_DT,
+                documents=records,
+                ignore_duplicates=True,
+            )
 
     frappe.db.commit()
 
@@ -240,16 +243,12 @@ def _process_sql_metadata_chunk(
 @lru_cache(maxsize=None)
 def get_table_name(table_id: str) -> str | None:
     # Note: Use this util only via CLI / single threaded
-    import frappe
-
     return frappe.db.get_value("MariaDB Table", table_id, "_table_name")
 
 
 @lru_cache(maxsize=None)
 def get_table_id(table_name: str):
     # Note: Use this util only via CLI / single threaded
-    import frappe
-
     return frappe.db.get_value("MariaDB Table", {"_table_name": table_name}, "name")
 
 
@@ -326,8 +325,6 @@ class Table:
         return self.name
 
     def exists(self) -> bool:
-        import frappe
-
         return bool(frappe.db.sql("SHOW TABLES LIKE %s", self.name))
 
     def find_index_candidates(
@@ -492,8 +489,6 @@ class QueryBenchmark:
         self.after = self.conduct_benchmark()
 
     def conduct_benchmark(self) -> list[list[dict]]:
-        import frappe
-
         return [
             frappe.db.sql(f"ANALYZE {ic.query.get_sample()}", as_dict=True, debug=self.verbose)
             for ic in self.index_candidates
@@ -505,7 +500,7 @@ class QueryBenchmark:
         results = [[]] * len(before)
 
         for i, (before_data, after_data) in enumerate(zip(before, after)):
-            for (before_row, after_row) in zip(before_data, after_data):
+            for before_row, after_row in zip(before_data, after_data):
                 results[i].append(
                     {
                         "before": {
