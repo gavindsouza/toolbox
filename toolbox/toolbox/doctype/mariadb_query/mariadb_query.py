@@ -9,6 +9,28 @@ from toolbox.utils import record_table
 
 
 class MariaDBQuery(Document):
+    # begin: auto-generated types
+    # This code is auto-generated. Do not modify anything in this block.
+
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        from frappe.types import DF
+
+        from toolbox.toolbox.doctype.mariadb_query_explain.mariadb_query_explain import (
+            MariaDBQueryExplain,
+        )
+
+        call_stack: DF.LongText | None
+        improved: DF.LongText | None
+        name: DF.Int | None
+        occurence: DF.Int
+        parameterized_query: DF.LongText | None
+        query: DF.LongText
+        query_explain: DF.Table[MariaDBQueryExplain]
+        tables: DF.Data | None
+    # end: auto-generated types
+
     def validate(self):
         self.set_tables_summary()
 

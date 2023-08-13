@@ -22,3 +22,4 @@ doc_events = {
 }
 
 boot_session = ["toolbox.overrides.boot_session"]
+export_python_type_annotations = True

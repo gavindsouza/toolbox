@@ -6,6 +6,26 @@ from frappe.model.document import Document
 
 
 class MariaDBTable(Document):
+    # begin: auto-generated types
+    # This code is auto-generated. Do not modify anything in this block.
+
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        from frappe.types import DF
+
+        from toolbox.toolbox.doctype.mariadb_query_candidate.mariadb_query_candidate import (
+            MariaDBQueryCandidate,
+        )
+
+        _table_exists: DF.Check
+        _table_name: DF.Data | None
+        num_queries: DF.Int
+        queries: DF.Table[MariaDBQueryCandidate]
+        table_category: DF.Literal["Read", "Write"]
+        table_category_meta: DF.JSON | None
+    # end: auto-generated types
+
     # TODO:
     # analyze table
     # 1. Show table size (MiB)

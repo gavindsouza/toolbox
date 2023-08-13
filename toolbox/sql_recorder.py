@@ -1,5 +1,4 @@
 import inspect
-import time
 from contextlib import suppress
 from re import compile
 
