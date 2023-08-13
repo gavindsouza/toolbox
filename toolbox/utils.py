@@ -1,17 +1,25 @@
+import json
 import re
+from collections import defaultdict
 from contextlib import contextmanager, suppress
 from enum import Enum, auto
 from functools import lru_cache
 from html import escape
+from itertools import groupby
 from typing import TYPE_CHECKING, Callable
 
+import frappe
 from click import secho
+from frappe.model.document import bulk_insert, now
+from frappe.utils.caching import request_cache
 from redis.exceptions import ConnectionError
 from sql_metadata import Parser, QueryType
 from sqlparse import format as format_sql
 from sqlparse import parse
 from sqlparse.sql import Comparison, Identifier, IdentifierList, Where
 from sqlparse.tokens import Keyword
+
+from toolbox.sql_recorder import TOOLBOX_RECORDER_DATA
 
 if TYPE_CHECKING:
     from sqlparse.sql import Statement
@@ -28,8 +36,6 @@ def wrap(value):
 
 
 def record_table(table: str) -> str:
-    import frappe
-
     table = table or "NULL"
 
     if table_id := frappe.get_all("MariaDB Table", {"_table_name": table}, limit=1, pluck="name"):
@@ -149,51 +155,53 @@ def handle_redis_connection_error():
 
 
 def process_sql_metadata_chunk(
-    queries: list[dict],
-    site: str,
-    setup: bool = True,
+    site: str = None,
     chunk_size: int = 5_000,
-    auto_commit: bool = True,
 ):
-    import frappe
-
     with frappe.init_site(site):
         frappe.connect()
-        return _process_sql_metadata_chunk(
-            queries,
-            setup=setup,
+        _process_sql_metadata_chunk(
             chunk_size=chunk_size,
-            auto_commit=auto_commit,
-            show_progress=True,
         )
+        frappe.db.commit()
+
+
+def get_unique_queries_map(chunk_size: int):
+    d = defaultdict(int)
+    c = frappe.cache
+
+    while qry := c.lpop(TOOLBOX_RECORDER_DATA):
+        d[qry] += 1
+        if len(d) >= chunk_size:
+            break
+    return d
 
 
 def _process_sql_metadata_chunk(
-    queries: list[dict],
-    setup: bool = True,
-    chunk_size: int = 5_000,
-    auto_commit: bool = True,
-    show_progress: bool = False,
+    chunk_size: int = 10_000,
 ):
-    import frappe
+    QUERIES: dict[bytes | str, int] = get_unique_queries_map(chunk_size=chunk_size)
+    EXPLAINABLE_QUERIES = ("select", "insert", "update", "delete")
+    MQ_TABLE = frappe.qb.DocType("MariaDB Query")
+    RECORDED_QUERIES = {}
 
-    sql_count = 0
-    granularity = chunk_size // 100
-
-    TOOLBOX_TABLES = set(
-        f"tab{x}" for x in frappe.get_all("DocType", {"module": "Toolbox"}, pluck="name")
-    )
-
-    if setup:
-        record_database_state(init=True)
-
-    for query_info in queries:
-        query: str = query_info["query"]
-
-        if not query.lower().startswith(("select", "insert", "update", "delete")):
+    for p_query, p_occurence in QUERIES.items():
+        if isinstance(p_query, bytes):
+            p_query = p_query.decode("utf-8")
+        # this is a parameterized_query
+        if not p_query.lstrip()[:7].lower().startswith(EXPLAINABLE_QUERIES):
             continue
 
-        parameterized_query: str = query_info["args"][0]
+        # increment occurence count
+        frappe.qb.update(MQ_TABLE).set(MQ_TABLE.occurence, MQ_TABLE.occurence + p_occurence).set(
+            MQ_TABLE.modified, now()
+        ).where(MQ_TABLE.parameterized_query == p_query).limit(1).run()
+
+        # check if query is already recorded
+        if frappe.db.sql("SELECT ROW_COUNT()", pluck=True)[0] > 0:
+            continue
+
+        query = Query(p_query).get_sample()
 
         # should check warnings too? unsure at this point
         explain_data = frappe.db.sql(f"EXPLAIN EXTENDED {query}", as_dict=True)
@@ -206,36 +214,27 @@ def _process_sql_metadata_chunk(
         # Better to strip them off and format on demand
         query_record = record_query(
             format_sql(query, strip_whitespace=True, keyword_case="upper"),
-            p_query=parameterized_query,
-            call_stack=query_info["stack"],
+            p_query=p_query,
         )
+        query_record.occurence += p_occurence
         for explain in explain_data:
-            # skip Toolbox internal queries
-            if explain["table"] not in TOOLBOX_TABLES:
-                query_record.apply_explain(explain)
-        query_record.save()
+            query_record.apply_explain(explain)
+        query_record.set_new_name()
+        query_record.set_parent_in_children()
 
-        sql_count += 1
-        if show_progress:
-            # Show approximate progress
-            print(
-                f"Processed ~{round(sql_count / granularity) * granularity:,} queries per job"
-                + " " * 5,
-                end="\r",
-            )
+        for df in query_record.meta.get_table_fields():
+            RECORDED_QUERIES.setdefault(df.options, []).extend(query_record.get(df.fieldname))
+        RECORDED_QUERIES.setdefault(query_record.doctype, []).append(query_record)
 
-        if auto_commit and frappe.db.transaction_writes > chunk_size:
-            frappe.db.commit()
+    for dt, records in RECORDED_QUERIES.items():
+        bulk_insert(
+            doctype=dt,
+            documents=records,
+            ignore_duplicates=True,
+        )
+        print(f"Recorded {len(records):,} new '{dt}' records")
 
-    frappe.get_doc(
-        {
-            "doctype": "SQL Record Summary",
-            "sql_count": sql_count,
-        }
-    ).insert()
-
-    if auto_commit:
-        frappe.db.commit()
+    return frappe.new_doc(doctype="SQL Record Summary", sql_count=len(QUERIES)).db_insert()
 
 
 @lru_cache(maxsize=None)

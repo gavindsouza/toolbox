@@ -65,71 +65,46 @@ def drop_recording(context):
 
 
 @click.command("process")
-@click.option("--chunk-size", default=2500, help="Number of queries to process in a single job")
+@click.option("--chunk-size", default=100_000, help="Number of queries to process in a single job")
+@click.option("--use-multiprocessing", is_flag=True, help="Use multiprocessing to process queries")
 @pass_context
-def process_metadata(context, chunk_size: int = 2500):
+def process_metadata(context, chunk_size: int = 100_000, use_multiprocessing: bool = False):
     from math import ceil
 
     import frappe
-    from frappe.utils.synchronization import filelock
 
-    from toolbox.sql_recorder import TOOLBOX_RECORDER_FLAG, export_data
+    from toolbox.sql_recorder import TOOLBOX_RECORDER_DATA
     from toolbox.utils import (
         check_dbms_compatibility,
         handle_redis_connection_error,
         process_sql_metadata_chunk,
-        record_database_state,
     )
 
-    CHUNK_SIZE = chunk_size or 2500
+    CHUNK_SIZE = chunk_size or 100_000
     SITE = get_site(context)
 
     with frappe.init_site(SITE), check_dbms_compatibility(
         frappe.conf
-    ), handle_redis_connection_error(), filelock("process_sql_metadata", timeout=0.1):
+    ), handle_redis_connection_error():
         # stop recording queries while processing
-        frappe.cache().delete_value(TOOLBOX_RECORDER_FLAG)
-        KEEP_RECORDER_ON = frappe.conf.toolbox and frappe.conf.toolbox.get("recorder")
-        queries = [query for request_data in export_data() for query in request_data]
+        CAPTURED_QUERIES_NUM = frappe.cache.llen(TOOLBOX_RECORDER_DATA)
+        NUM_JOBS = int(ceil(CAPTURED_QUERIES_NUM / CHUNK_SIZE))
 
-        NUM_JOBS = 1
-        if len(queries) > CHUNK_SIZE:
-            NUM_JOBS = ceil(len(queries) / CHUNK_SIZE)
-
-        print(f"Processing {len(queries):,} queries in {NUM_JOBS} jobs")
-
-        if NUM_JOBS > 1:
+        if use_multiprocessing and (NUM_JOBS > 1):
             from multiprocessing import Pool
 
-            frappe.connect()
-            record_database_state(init=True)
-
             with Pool(NUM_JOBS) as p:
-                for i in range(NUM_JOBS):
+                for _ in range(NUM_JOBS):
                     p.apply_async(
                         process_sql_metadata_chunk,
-                        args=(queries[i * CHUNK_SIZE : (i + 1) * CHUNK_SIZE],),
-                        kwds={"site": SITE, "setup": False, "chunk_size": CHUNK_SIZE},
+                        kwds={"site": SITE, "chunk_size": CHUNK_SIZE},
                     )
                 p.close()
                 p.join()
         else:
-            process_sql_metadata_chunk(queries, SITE, setup=True, chunk_size=CHUNK_SIZE)
+            process_sql_metadata_chunk(site=SITE, chunk_size=CHUNK_SIZE)
 
         print("Done processing queries across all jobs")
-
-        with frappe.init_site(SITE):
-            frappe.connect()
-            record_database_state()
-
-            print("Done recording database state")
-
-            if KEEP_RECORDER_ON:
-                frappe.cache().set_value(TOOLBOX_RECORDER_FLAG, 1)
-            else:
-                print("*** SQL Recorder switched off ***")
-
-        drop_recording.callback()
 
 
 @click.command("cleanup")

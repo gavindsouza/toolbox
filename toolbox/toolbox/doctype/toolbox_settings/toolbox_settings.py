@@ -1,10 +1,15 @@
 # Copyright (c) 2023, Gavin D'souza and contributors
 # For license information, please see license.txt
 
+from typing import TYPE_CHECKING
+
 import frappe
 from frappe.model.document import Document
 
 from toolbox.utils import check_dbms_compatibility
+
+if TYPE_CHECKING:
+    from frappe.core.doctype.scheduled_job_type.scheduled_job_type import ScheduledJobType
 
 PROCESS_SQL_JOB_TITLE = "Process SQL Recorder"
 PROCESS_SQL_JOB_METHOD = "toolbox_settings.process_sql_recorder"
@@ -52,33 +57,22 @@ class ToolBoxSettings(Document):
         scheduled_job.save()
 
 
-def process_sql_recorder():
+def process_sql_recorder(chunk_size: int = 100_000):
     import frappe
     from frappe.utils.synchronization import filelock
 
-    from toolbox.sql_recorder import TOOLBOX_RECORDER_FLAG, delete_data, export_data
+    from toolbox.sql_recorder import TOOLBOX_RECORDER_DATA
     from toolbox.utils import _process_sql_metadata_chunk, record_database_state
 
-    CHUNK_SIZE = 2500
-
     with filelock("process_sql_metadata", timeout=0.1):
-        # stop recording queries while processing
-        frappe.cache().delete_value(TOOLBOX_RECORDER_FLAG)
-        KEEP_RECORDER_ON = frappe.conf.toolbox and frappe.conf.toolbox.get("recorder")
-        queries = [query for request_data in export_data() for query in request_data]
-
-        print(f"Processing {len(queries):,} queries")
-        record_database_state(init=True)
-        _process_sql_metadata_chunk(queries, chunk_size=CHUNK_SIZE, show_progress=False)
+        QRY_COUNT = frappe.cache.llen(TOOLBOX_RECORDER_DATA)
+        print(f"Processing {QRY_COUNT:,} queries")
+        _process_sql_metadata_chunk(chunk_size=chunk_size)
         frappe.enqueue(
+            # this ought to find broken links & generate records for them too
             record_database_state,
             queue="long",
+            job_id=record_database_state.__name__,
+            deduplicate=True,
         )
         print("Done processing queries across all jobs")
-
-        delete_data()
-
-        if KEEP_RECORDER_ON:
-            frappe.cache().set_value(TOOLBOX_RECORDER_FLAG, 1)
-        else:
-            print("*** SQL Recorder switched off ***")

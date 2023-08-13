@@ -10,30 +10,15 @@ TOOLBOX_RECORDER_FLAG = "toolbox-sql_recorder-enabled"
 TOOLBOX_RECORDER_DATA = "toolbox-sql_recorder-records"
 
 
-def export_data() -> list[list[dict[str, str | float | list[dict]]]]:
-    return list(frappe.cache().hgetall(TOOLBOX_RECORDER_DATA).values())
-
-
-def delete_data():
-    frappe.cache().delete_value(TOOLBOX_RECORDER_DATA)
-
-
 def sql(*args, **kwargs):
-    start_time = time.monotonic()
+    # impl 1: store most context - gets slowerer to process & adds more overhead to each request
+    # impl 2 note: using args[0] to capture only the parameterized query
+
+    # NOTE: this is not a complete solution, as it does not capture the values of the parameters
+    # TODO: evaluate a solution that captures the values so we can generate better Query.get_sample
+
     result = frappe.local.db_sql(*args, **kwargs)
-    end_time = time.monotonic()
-
-    frappe.local.toolbox_recorder.register(
-        {
-            "query": frappe.db.last_query,
-            "args": args,
-            "kwargs": kwargs,
-            "stack": list(get_current_stack_frames()),
-            "time": start_time,
-            "duration": float(f"{(end_time - start_time) * 1000:.3f}"),
-        }
-    )
-
+    frappe.local.toolbox_recorder.register(args[0])
     return result
 
 
@@ -47,7 +32,7 @@ def _unpatch():
 
 
 def before_hook(*args, **kwargs):
-    if frappe.cache().get_value(TOOLBOX_RECORDER_FLAG):
+    if frappe.cache.get_value(TOOLBOX_RECORDER_FLAG):
         frappe.local.toolbox_recorder = SQLRecorder()
         _patch()
 
@@ -82,14 +67,16 @@ def get_current_stack_frames():
 
 class SQLRecorder:
     def __init__(self):
-        self.uuid = frappe.generate_hash(length=10)
         self.queries = []
 
-    def register(self, data):
-        self.queries.append(data)
+    def register(self, query: str):
+        self.queries.append(query)
 
     def dump(self):
         if not self.queries:
             return
         self.queries, dump = [], self.queries[:]
-        frappe.cache().hset(TOOLBOX_RECORDER_DATA, self.uuid, dump)
+
+        c = frappe.cache
+        key = c.make_key(TOOLBOX_RECORDER_DATA)
+        c.execute_command("RPUSH", key, *dump)
