@@ -1,7 +1,8 @@
 {
  "charts": [],
- "content": "[{\"id\":\"oZvri3L9DM\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Toolbox</span>\",\"col\":12}},{\"id\":\"f3YRJsrkAS\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"wotZaWJVUQ\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Queries\",\"col\":3}},{\"id\":\"A1vgmEcuNY\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Tables\",\"col\":3}},{\"id\":\"pu4Xty2Zwg\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Indexes\",\"col\":3}},{\"id\":\"a8AZHgw6c_\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"riOeD-B9cl\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Unused Mariadb Indexes\",\"col\":3}},{\"id\":\"_9FGn_vOXn\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Index Manager\",\"col\":3}}]",
+ "content": "[{\"id\":\"oZvri3L9DM\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Toolbox</span>\",\"col\":12}},{\"id\":\"vI4m_IUdTJ\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Site Manager\",\"col\":3}},{\"id\":\"_9FGn_vOXn\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Index Manager\",\"col\":3}},{\"id\":\"ZQbxseLuC9\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Toolbox Settings\",\"col\":3}},{\"id\":\"f3YRJsrkAS\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"wotZaWJVUQ\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Queries\",\"col\":3}},{\"id\":\"A1vgmEcuNY\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Tables\",\"col\":3}},{\"id\":\"pu4Xty2Zwg\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Indexes\",\"col\":3}},{\"id\":\"a8AZHgw6c_\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"riOeD-B9cl\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Unused Mariadb Indexes\",\"col\":3}},{\"id\":\"y4TNRXIWED\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"JcEX4lI-5V\",\"type\":\"card\",\"data\":{\"card_name\":\"Dasboards\",\"col\":4}},{\"id\":\"VoEkZRNPHw\",\"type\":\"card\",\"data\":{\"card_name\":\"Reports\",\"col\":4}}]",
  "creation": "2023-01-28 12:41:28.998511",
+ "custom_blocks": [],
  "docstatus": 0,
  "doctype": "Workspace",
  "for_user": "",
@@ -10,8 +11,85 @@
  "idx": 0,
  "is_hidden": 0,
  "label": "Toolbox",
- "links": [],
- "modified": "2023-03-14 12:56:35.521078",
+ "links": [
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Dasboards",
+   "link_count": 2,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Site Manager",
+   "link_count": 0,
+   "link_to": "site-manager",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Index Manager",
+   "link_count": 0,
+   "link_to": "index-manager",
+   "link_type": "Page",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Reports",
+   "link_count": 4,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Unused Indexes",
+   "link_count": 0,
+   "link_to": "Unused MariaDB Indexes",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Storage",
+   "link_count": 0,
+   "link_to": "Database Storage Usage By Tables",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Hooks",
+   "link_count": 0,
+   "link_to": "Audit System Hooks",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "User Permissions",
+   "link_count": 0,
+   "link_to": "Permitted Documents For User",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2023-06-02 17:31:56.816332",
  "modified_by": "Administrator",
  "module": "Toolbox",
  "name": "Toolbox",
@@ -39,9 +117,23 @@
   {
    "color": "Grey",
    "doc_view": "List",
+   "label": "Site Manager",
+   "link_to": "site-manager",
+   "type": "Page"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
    "label": "Unused Mariadb Indexes",
    "link_to": "Unused MariaDB Indexes",
    "type": "Report"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Toolbox Settings",
+   "link_to": "ToolBox Settings",
+   "type": "DocType"
   },
   {
    "color": "Grey",

@@ -13,6 +13,9 @@ frappe.pages['index-manager'].on_page_load = function (wrapper) {
         single_column: true
     });
     page.add_button("Settings", () => frappe.set_route("Form", ToolboxSettings));
+    page.add_menu_item("Refresh", function() {
+        frappe.pages['index-manager'].refresh(page.parent);
+    }.bind(page));
 }
 
 frappe.pages['index-manager'].refresh = async function (wrapper) {
