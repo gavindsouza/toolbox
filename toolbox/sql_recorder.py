@@ -1,4 +1,5 @@
 import inspect
+from collections import Counter
 from contextlib import suppress
 from re import compile
 
@@ -74,8 +75,14 @@ class SQLRecorder:
     def dump(self):
         if not self.queries:
             return
-        self.queries, dump = [], self.queries[:]
 
         c = frappe.cache
         key = c.make_key(TOOLBOX_RECORDER_DATA)
-        c.execute_command("RPUSH", key, *dump)
+        pipe = c.pipeline(transaction=False)
+
+        for query, occurence in Counter(self.queries).items():
+            if not c.hsetnx(key, query, occurence):
+                pipe.hincrby(key, query, occurence)
+
+        pipe.execute()
+        self.queries = []

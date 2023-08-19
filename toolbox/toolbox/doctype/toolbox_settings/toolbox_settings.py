@@ -58,17 +58,27 @@ class ToolBoxSettings(Document):
         return scheduled_job.save()
 
 
-def process_sql_recorder(chunk_size: int = 100_000):
+def process_sql_recorder():
     import frappe
     from frappe.utils.synchronization import filelock
 
     from toolbox.sql_recorder import TOOLBOX_RECORDER_DATA
-    from toolbox.utils import _process_sql_metadata_chunk, record_database_state
+    from toolbox.utils import process_sql_metadata_chunk, record_database_state
 
     with filelock("process_sql_metadata", timeout=0.1):
-        QRY_COUNT = frappe.cache.llen(TOOLBOX_RECORDER_DATA)
+        c = frappe.cache
+        DATA_KEY = c.make_key(TOOLBOX_RECORDER_DATA)
+        QRY_COUNT = c.hlen(DATA_KEY)
         print(f"Processing {QRY_COUNT:,} queries")
-        _process_sql_metadata_chunk(chunk_size=chunk_size)
+
+        pipe = c.pipeline()
+        pipe.execute_command("HGETALL", DATA_KEY)
+        pipe.execute_command("DEL", DATA_KEY)
+        queries: dict[str, int] = {
+            k.decode(): int(v.decode()) for k, v in pipe.execute()[0].items()
+        }
+
+        process_sql_metadata_chunk(queries)
         frappe.enqueue(
             # this ought to find broken links & generate records for them too
             record_database_state,

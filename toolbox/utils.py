@@ -1,6 +1,5 @@
 import json
 import re
-from collections import defaultdict
 from contextlib import contextmanager, suppress
 from enum import Enum, auto
 from functools import lru_cache
@@ -18,8 +17,6 @@ from sqlparse import format as format_sql
 from sqlparse import parse
 from sqlparse.sql import Comparison, Identifier, IdentifierList, Where
 from sqlparse.tokens import Keyword
-
-from toolbox.sql_recorder import TOOLBOX_RECORDER_DATA
 
 if TYPE_CHECKING:
     from sqlparse.sql import Statement
@@ -158,37 +155,13 @@ def handle_redis_connection_error():
 
 
 def process_sql_metadata_chunk(
-    site: str = None,
-    chunk_size: int = 5_000,
+    queries: dict[str, int],
 ):
-    with frappe.init_site(site):
-        frappe.connect()
-        _process_sql_metadata_chunk(
-            chunk_size=chunk_size,
-        )
-        frappe.db.commit()
-
-
-def get_unique_queries_map(chunk_size: int):
-    d = defaultdict(int)
-    c = frappe.cache
-
-    while qry := c.lpop(TOOLBOX_RECORDER_DATA):
-        d[qry] += 1
-        if len(d) >= chunk_size:
-            break
-    return d
-
-
-def _process_sql_metadata_chunk(
-    chunk_size: int = 10_000,
-):
-    QUERIES: dict[bytes | str, int] = get_unique_queries_map(chunk_size=chunk_size)
     EXPLAINABLE_QUERIES = ("select", "insert", "update", "delete")
     MQ_TABLE = frappe.qb.DocType("MariaDB Query")
     RECORDED_QUERIES = {}
 
-    for p_query, p_occurence in QUERIES.items():
+    for p_query, p_occurence in queries.items():
         if isinstance(p_query, bytes):
             p_query = p_query.decode("utf-8")
         # this is a parameterized_query
@@ -237,7 +210,7 @@ def _process_sql_metadata_chunk(
         )
         print(f"Recorded {len(records):,} new '{dt}' records")
 
-    return frappe.new_doc(doctype="SQL Record Summary", sql_count=len(QUERIES)).db_insert()
+    return frappe.new_doc(doctype="SQL Record Summary", sql_count=len(queries)).db_insert()
 
 
 @lru_cache(maxsize=None)
