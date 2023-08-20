@@ -265,10 +265,10 @@ class Query:
         ret = self.sql
 
         if "%s" in self.sql:
-            ret = ret.replace("%s", "1")
+            ret = ret.replace("%s", "'1'")
 
         else:
-            for k, v in ((p, "1") for p in PARAMS_PATTERN.findall(self.sql)):
+            for k, v in ((p, "'1'") for p in PARAMS_PATTERN.findall(self.sql)):
                 ret = ret.replace(k, v)
 
         return format_sql(ret, strip_whitespace=True, keyword_case="upper")
@@ -458,6 +458,14 @@ class Table:
         return required_indexes
 
 
+def get_analyzed_result(sql: str, verbose: bool = False):
+    try:
+        return frappe.db.sql(f"ANALYZE {sql}", as_dict=True, debug=verbose)
+    except Exception as e:
+        print(f"ERROR: {e} while analyzing {sql}")
+        return [{"r_filtered": -1, "r_rows": "0.00", "Extra": "Using where"}]
+
+
 class QueryBenchmark:
     def __init__(self, index_candidates: list[IndexCandidate], verbose=False):
         self.index_candidates = index_candidates
@@ -474,7 +482,7 @@ class QueryBenchmark:
 
     def conduct_benchmark(self) -> list[list[dict]]:
         return [
-            frappe.db.sql(f"ANALYZE {ic.query.get_sample()}", as_dict=True, debug=self.verbose)
+            get_analyzed_result(ic.query.get_sample(), verbose=self.verbose)
             for ic in self.index_candidates
         ]
 
