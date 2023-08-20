@@ -210,7 +210,11 @@ def process_sql_metadata_chunk(
         )
         print(f"Recorded {len(records):,} new '{dt}' records")
 
-    return frappe.new_doc(doctype="SQL Record Summary", sql_count=len(queries)).db_insert()
+    return frappe.new_doc(
+        doctype="SQL Record Summary",
+        total_sql_count=sum(queries.values()),
+        unique_sql_count=len(queries),
+    ).db_insert()
 
 
 @lru_cache(maxsize=None)
