@@ -160,6 +160,7 @@ def process_sql_metadata_chunk(
     EXPLAINABLE_QUERIES = ("select", "insert", "update", "delete")
     MQ_TABLE = frappe.qb.DocType("MariaDB Query")
     RECORDED_QUERIES = {}
+    USE_FALLBACK_PROPERTY = object()
 
     for p_query, p_occurence in queries.items():
         if isinstance(p_query, bytes):
@@ -173,8 +174,14 @@ def process_sql_metadata_chunk(
             MQ_TABLE.modified, now()
         ).where(MQ_TABLE.parameterized_query == p_query).limit(1).run()
 
-        # check if query is already recorded
-        if frappe.db.sql("SELECT ROW_COUNT()", pluck=True)[0] > 0:
+        # check if query is already recorded (first try cursor's rowcount property)
+        if (
+            rowcount := getattr(frappe.db._cursor, "rowcount", USE_FALLBACK_PROPERTY)
+        ) is not USE_FALLBACK_PROPERTY:
+            if rowcount > 0:
+                continue
+        # fallback to raw sql if cursor property is not available
+        elif frappe.db.sql("SELECT ROW_COUNT()", pluck=True)[0] > 0:
             continue
 
         query = Query(p_query).get_sample()
