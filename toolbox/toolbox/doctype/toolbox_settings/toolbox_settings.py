@@ -11,16 +11,44 @@ from toolbox.utils import check_dbms_compatibility
 if TYPE_CHECKING:
     from frappe.core.doctype.scheduled_job_type.scheduled_job_type import ScheduledJobType
 
-PROCESS_SQL_JOB_TITLE = "Process SQL Recorder"
-PROCESS_SQL_JOB_METHOD = "toolbox_settings.process_sql_recorder"
+SCHEDULED_JOBS = [
+    {
+        "id": "process_sql_recorder",
+        "title": "Process SQL Recorder",
+        "method": "toolbox_settings.process_sql_recorder",  # Note: this is how Frappe stores the method name for Scheduled Job Type
+        "frequency_property": "sql_recorder_processing_interval",
+        "enabled_property": "is_sql_recorder_enabled",
+    },
+    {
+        "id": "process_index_manager",
+        "title": "Process Index Manager",
+        "method": "toolbox_settings.process_index_manager",
+        "frequency_property": "index_manager_processing_interval",
+        "enabled_property": "is_index_manager_enabled",
+    },
+]
 
 
 class ToolBoxSettings(Document):
+    # begin: auto-generated types
+    # This code is auto-generated. Do not modify anything in this block.
+
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        from frappe.types import DF
+
+        index_manager_processing_interval: DF.Literal["Hourly", "Daily"]
+        is_index_manager_enabled: DF.Check
+        is_sql_recorder_enabled: DF.Check
+        sql_recorder_processing_interval: DF.Literal["Hourly", "Daily"]
+    # end: auto-generated types
+
     def validate(self):
         with check_dbms_compatibility(frappe.conf, raise_error=True):
             ...
         self.set_missing_settings()
-        self.update_scheduled_job()
+        self.update_scheduled_jobs()
 
     def on_change(self):
         # clear bootinfo for all System Managers
@@ -30,7 +58,7 @@ class ToolBoxSettings(Document):
             frappe.cache.hdel("bootinfo", user)
 
     def set_missing_settings(self):
-        if self.is_index_manager_enabled:
+        if self.is_index_manager_enabled and not self.is_sql_recorder_enabled:
             self.is_sql_recorder_enabled = True
             frappe.msgprint(
                 "Index Manager requires SQL Recorder to be enabled. Enabling SQL Recorder.",
@@ -38,24 +66,36 @@ class ToolBoxSettings(Document):
             )
         if not self.sql_recorder_processing_interval:
             self.sql_recorder_processing_interval = "Hourly"
+        if not self.index_manager_processing_interval:
+            self.index_manager_processing_interval = "Hourly"
 
-    def update_scheduled_job(self):
+    def update_scheduled_jobs(self):
+        # Set up scheduled jobs for index manager & sql recorder
         scheduled_job: "ScheduledJobType"
-        try:
-            scheduled_job = frappe.get_doc("Scheduled Job Type", PROCESS_SQL_JOB_METHOD)
-        except frappe.DoesNotExistError:
-            frappe.clear_last_message()
-            scheduled_job = frappe.new_doc("Scheduled Job Type")
-            scheduled_job.name = PROCESS_SQL_JOB_METHOD
 
-        scheduled_job.stopped = not self.is_sql_recorder_enabled
-        scheduled_job.method = (
-            "toolbox.toolbox.doctype.toolbox_settings.toolbox_settings.process_sql_recorder"
-        )
-        scheduled_job.create_log = 1
-        scheduled_job.frequency = self.sql_recorder_processing_interval + " Long"
+        for job in SCHEDULED_JOBS:
+            try:
+                scheduled_job = frappe.get_doc("Scheduled Job Type", job["method"])
+            except frappe.DoesNotExistError:
+                frappe.clear_last_message()
+                scheduled_job = frappe.new_doc("Scheduled Job Type")
+                scheduled_job.name = job["method"]
 
-        return scheduled_job.save()
+            scheduled_job.stopped = not getattr(self, job["enabled_property"], False)
+            scheduled_job.method = f"toolbox.toolbox.doctype.toolbox_settings.{job['method']}"
+            scheduled_job.create_log = 1
+
+            # add job for generating indexes to a longer queue
+            if job["id"] == "process_index_manager":
+                scheduled_job.frequency = f"{self.index_manager_processing_interval} Long"
+            # add job for processing sql recorder to a shorter queue 30 mins before index manager job
+            elif job["id"] == "process_sql_recorder":
+                scheduled_job.frequency = "Cron"
+                if self.sql_recorder_processing_interval == "Hourly":
+                    scheduled_job.cron_format = "30 * * * *"
+                elif self.sql_recorder_processing_interval == "Daily":
+                    scheduled_job.cron_format = "0 23 * * *"
+            scheduled_job.save()
 
 
 def process_sql_recorder():

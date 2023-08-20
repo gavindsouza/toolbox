@@ -7,6 +7,7 @@ frappe.ui.form.on("ToolBox Settings", {
     },
     refresh(frm) {
         frm.add_custom_button("Index Manager", () => frappe.set_route("index-manager"));
-        frm.add_custom_button("Show Scheduled Job", () => frappe.set_route("Form", "Scheduled Job Type", "toolbox_settings.process_sql_recorder"));
+        frm.add_custom_button("Query Processor", () => frappe.set_route("Form", "Scheduled Job Type", "toolbox_settings.process_sql_recorder"), "Show Scheduled Jobs");
+        frm.add_custom_button("Index Manager", () => frappe.set_route("Form", "Scheduled Job Type", "toolbox_settings.process_index_manager"), "Show Scheduled Jobs");
     }
 });

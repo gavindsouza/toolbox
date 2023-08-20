@@ -9,6 +9,7 @@
  "field_order": [
   "index_manager_section",
   "is_index_manager_enabled",
+  "index_manager_processing_interval",
   "sql_recorder_section",
   "is_sql_recorder_enabled",
   "sql_recorder_processing_interval"
@@ -41,12 +42,18 @@
    "fieldtype": "Select",
    "label": "Processing Interval",
    "options": "Hourly\nDaily"
+  },
+  {
+   "fieldname": "index_manager_processing_interval",
+   "fieldtype": "Select",
+   "label": "Processing Interval",
+   "options": "Hourly\nDaily"
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2023-03-04 02:11:36.431765",
+ "modified": "2023-08-20 18:23:39.018180",
  "modified_by": "Administrator",
  "module": "Toolbox",
  "name": "ToolBox Settings",
