@@ -4,6 +4,7 @@ from contextlib import suppress
 from re import compile
 
 import frappe
+import toolbox
 
 TRACEBACK_PATH_PATTERN = compile(".*/apps/")
 TOOLBOX_RECORDER_FLAG = "toolbox-sql_recorder-enabled"
@@ -32,7 +33,13 @@ def _unpatch():
 
 
 def before_hook(*args, **kwargs):
-    if frappe.cache.get_value(TOOLBOX_RECORDER_FLAG):
+    toolbox_recorder_enabled = frappe.cache.get_value(TOOLBOX_RECORDER_FLAG)
+
+    if toolbox_recorder_enabled is None:
+        toolbox_recorder_enabled = toolbox.get_settings("is_index_manager_enabled")
+        frappe.cache.set_value(TOOLBOX_RECORDER_FLAG, toolbox_recorder_enabled)
+
+    if toolbox_recorder_enabled:
         frappe.local.toolbox_recorder = SQLRecorder()
         _patch()
 
