@@ -187,7 +187,11 @@ def process_sql_metadata_chunk(
         query = Query(p_query).get_sample()
 
         # should check warnings too? unsure at this point
-        explain_data = frappe.db.sql(f"EXPLAIN EXTENDED {query}", as_dict=True)
+        try:
+            explain_data = frappe.db.sql(f"EXPLAIN EXTENDED {query}", as_dict=True)
+        except Exception as e:
+            frappe.logger("toolbox").exception(f"process_sql_metadata_chunk: EXPLAIN EXTENDED {query}")
+            continue
 
         if not explain_data:
             print(f"Cannot explain query: {query}")
@@ -265,10 +269,10 @@ class Query:
         ret = self.sql
 
         if "%s" in self.sql:
-            ret = ret.replace("%s", "'1'")
+            ret = ret.replace("%s", "1")
 
         else:
-            for k, v in ((p, "'1'") for p in PARAMS_PATTERN.findall(self.sql)):
+            for k, v in ((p, "1") for p in PARAMS_PATTERN.findall(self.sql)):
                 ret = ret.replace(k, v)
 
         return format_sql(ret, strip_whitespace=True, keyword_case="upper")
