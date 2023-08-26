@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import frappe
 from frappe.model.document import Document
 
+from toolbox.sql_recorder import TOOLBOX_RECORDER_FLAG
 from toolbox.utils import check_dbms_compatibility
 
 if TYPE_CHECKING:
@@ -27,6 +28,17 @@ SCHEDULED_JOBS = [
         "enabled_property": "is_index_manager_enabled",
     },
 ]
+
+
+def toggle_sql_recorder(enabled: bool):
+    frappe.cache.set_value(TOOLBOX_RECORDER_FLAG, enabled)
+
+
+def clear_system_manager_cache():
+    for user in frappe.get_all(
+        "Has Role", filters={"role": "System Manager"}, pluck="parent", distinct=True
+    ):
+        frappe.cache.hdel("bootinfo", user)
 
 
 class ToolBoxSettings(Document):
@@ -51,11 +63,8 @@ class ToolBoxSettings(Document):
         self.update_scheduled_jobs()
 
     def on_change(self):
-        # clear bootinfo for all System Managers
-        for user in frappe.get_all(
-            "Has Role", filters={"role": "System Manager"}, pluck="parent", distinct=True
-        ):
-            frappe.cache.hdel("bootinfo", user)
+        frappe.db.after_commit.add(lambda: toggle_sql_recorder(self.is_sql_recorder_enabled))
+        frappe.db.after_commit.add(clear_system_manager_cache)
 
     def set_missing_settings(self):
         if self.is_index_manager_enabled and not self.is_sql_recorder_enabled:
