@@ -15,4 +15,6 @@ Upcoming Features:
 
 #### License
 
-No license. Reach out to project author at gavin18d@gmail.com to use this project.
+Copyright © 2023, [Gavin D'souza](https://github.com/gavindsouza) [me@gavv.in, gavin18d@gmail.com].
+
+ToolBox is released under "Restricted Use" License. Refer to [LICENSE](LICENSE) for full information.
