@@ -1,0 +1,29 @@
+{
+ "cards": [
+  {
+   "card": "Indexes Created By ToolBox"
+  }
+ ],
+ "charts": [
+  {
+   "chart": "Most Active Tables",
+   "width": "Half"
+  },
+  {
+   "chart": "Queries Recorded",
+   "width": "Half"
+  }
+ ],
+ "creation": "2023-12-18 05:02:28.256963",
+ "dashboard_name": "Index Manager",
+ "docstatus": 0,
+ "doctype": "Dashboard",
+ "idx": 0,
+ "is_default": 0,
+ "is_standard": 1,
+ "modified": "2023-12-19 19:16:30.375026",
+ "modified_by": "Administrator",
+ "module": "Toolbox",
+ "name": "Index Manager",
+ "owner": "Administrator"
+}

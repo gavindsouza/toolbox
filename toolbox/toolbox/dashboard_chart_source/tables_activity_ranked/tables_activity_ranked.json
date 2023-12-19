@@ -1,0 +1,13 @@
+{
+ "creation": "2023-12-18 05:09:08.050538",
+ "docstatus": 0,
+ "doctype": "Dashboard Chart Source",
+ "idx": 0,
+ "modified": "2023-12-18 05:09:08.050538",
+ "modified_by": "Administrator",
+ "module": "Toolbox",
+ "name": "Tables Activity Ranked",
+ "owner": "Administrator",
+ "source_name": "Tables Activity Ranked",
+ "timeseries": 0
+}

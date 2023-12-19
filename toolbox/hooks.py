@@ -21,5 +21,7 @@ doc_events = {
     }
 }
 
+app_include_js = "/assets/toolbox/toolbox.js"
+
 boot_session = ["toolbox.overrides.boot_session"]
 export_python_type_annotations = True

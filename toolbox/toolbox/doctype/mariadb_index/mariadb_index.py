@@ -203,6 +203,7 @@ def get_filter_clause(filters: list[list]) -> str:
     where_clause = []
 
     for f in filters:
+        f = f[:4]
         i = len(f) - 3
         where_clause.append(f"{get_column_name(f[i])} {f[i+1]} {wrap_query_constant(f[i+2])}")
 
@@ -210,7 +211,7 @@ def get_filter_clause(filters: list[list]) -> str:
 
 
 def get_accessible_fields(fields: list[str]) -> list[str]:
-    if fields == ["*"] or fields == ["count(*)"]:
+    if fields == ["*"] or fields == ["count(*)"] or fields == ["count(*) as result"]:
         return fields
 
     allowed_fields = []
