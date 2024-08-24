@@ -17,4 +17,4 @@ Upcoming Features:
 
 Copyright © 2023, [Gavin D'souza](https://github.com/gavindsouza) [me@gavv.in, gavin18d@gmail.com].
 
-ToolBox is released under "Restricted Use" License. Refer to [LICENSE](LICENSE) for full information.
+ToolBox is released under "AGPL" License. Refer to [LICENSE](LICENSE) for full information.
