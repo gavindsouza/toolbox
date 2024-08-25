@@ -10,3 +10,8 @@ def boot_session(bootinfo):
                 "enabled": toolbox.get_settings("is_index_manager_enabled"),
             }
         }
+
+def after_migrate():
+    import frappe
+
+    frappe.get_single("ToolBox Settings").update_scheduled_jobs()

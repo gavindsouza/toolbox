@@ -16,14 +16,15 @@ SCHEDULED_JOBS = [
     {
         "id": "process_sql_recorder",
         "title": "Process SQL Recorder",
-        "method": "toolbox_settings.process_sql_recorder",  # Note: this is how Frappe stores the method name for Scheduled Job Type
+        # Note: this is how Frappe stores the method name for Scheduled Job Type - updated Aug 2024
+        "method": f"{__name__}.process_sql_recorder",
         "frequency_property": "sql_recorder_processing_interval",
         "enabled_property": "is_sql_recorder_enabled",
     },
     {
         "id": "process_index_manager",
         "title": "Process Index Manager",
-        "method": "toolbox_settings.process_index_manager",
+        "method": f"{__name__}.process_index_manager",
         "frequency_property": "index_manager_processing_interval",
         "enabled_property": "is_index_manager_enabled",
     },
@@ -84,14 +85,14 @@ class ToolBoxSettings(Document):
 
         for job in SCHEDULED_JOBS:
             try:
-                scheduled_job = frappe.get_doc("Scheduled Job Type", job["method"])
+                scheduled_job = frappe.get_doc("Scheduled Job Type", {"method": job["method"]})
             except frappe.DoesNotExistError:
                 frappe.clear_last_message()
                 scheduled_job = frappe.new_doc("Scheduled Job Type")
                 scheduled_job.name = job["method"]
 
             scheduled_job.stopped = not getattr(self, job["enabled_property"], False)
-            scheduled_job.method = f"toolbox.toolbox.doctype.toolbox_settings.{job['method']}"
+            scheduled_job.method = job["method"]
             scheduled_job.create_log = 1
 
             # add job for generating indexes to a longer queue

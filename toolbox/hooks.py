@@ -13,6 +13,8 @@ after_request = ["toolbox.sql_recorder.after_hook", "toolbox.doctype_flow.dump"]
 before_job = ["toolbox.sql_recorder.before_hook"]
 after_job = ["toolbox.sql_recorder.after_hook", "toolbox.doctype_flow.dump"]
 
+after_migrate = ["toolbox.overrides.after_migrate"]
+
 doc_events = {
     "*": {
         "before_insert": "toolbox.doctype_flow.start",
