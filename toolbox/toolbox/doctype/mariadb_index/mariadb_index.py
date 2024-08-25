@@ -232,7 +232,7 @@ def get_mapped_field(field: str) -> str | None:
     order = "asc"
 
     if len(_first_field) > 1:
-        order = _first_field[1]
+        order = _first_field[1].strip(",")
 
     if first_field in FIELD_ALIAS:
         return f"{first_field} {order}"
