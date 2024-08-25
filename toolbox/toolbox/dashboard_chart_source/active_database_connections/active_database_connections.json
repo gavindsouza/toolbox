@@ -1,0 +1,13 @@
+{
+ "creation": "2024-01-07 21:23:02.123658",
+ "docstatus": 0,
+ "doctype": "Dashboard Chart Source",
+ "idx": 0,
+ "modified": "2024-01-07 21:23:02.123658",
+ "modified_by": "Administrator",
+ "module": "Toolbox",
+ "name": "Active Database Connections",
+ "owner": "Administrator",
+ "source_name": "Active Database Connections",
+ "timeseries": 0
+}

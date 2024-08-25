@@ -1,0 +1,21 @@
+{
+ "cards": [],
+ "charts": [
+  {
+   "chart": "Active Database Connections",
+   "width": "Half"
+  }
+ ],
+ "creation": "2024-01-07 21:11:16.532329",
+ "dashboard_name": "Site Manager",
+ "docstatus": 0,
+ "doctype": "Dashboard",
+ "idx": 0,
+ "is_default": 0,
+ "is_standard": 1,
+ "modified": "2024-01-07 21:30:18.615259",
+ "modified_by": "Administrator",
+ "module": "Toolbox",
+ "name": "Site Manager",
+ "owner": "Administrator"
+}
