@@ -112,7 +112,7 @@ class MariaDBIndexDocument(Document):
 
     @staticmethod
     def get_count(args=None, **kwargs):
-        args = get_args(args, **kwargs)
+        args = get_args(args, kwargs)
         query = get_index_query(["count(distinct name)"], args["filters"])
         return frappe.db.sql(query)[0][0]
 
