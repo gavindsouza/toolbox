@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"oZvri3L9DM\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Toolbox</span>\",\"col\":12}},{\"id\":\"vI4m_IUdTJ\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Site Manager\",\"col\":3}},{\"id\":\"okWdS879OT\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Index Manager\",\"col\":3}},{\"id\":\"ZQbxseLuC9\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Toolbox Settings\",\"col\":3}},{\"id\":\"f3YRJsrkAS\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"wotZaWJVUQ\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Queries\",\"col\":3}},{\"id\":\"A1vgmEcuNY\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Tables\",\"col\":3}},{\"id\":\"pu4Xty2Zwg\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Indexes\",\"col\":3}},{\"id\":\"a8AZHgw6c_\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"riOeD-B9cl\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Unused Mariadb Indexes\",\"col\":3}},{\"id\":\"y4TNRXIWED\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"VoEkZRNPHw\",\"type\":\"card\",\"data\":{\"card_name\":\"Reports\",\"col\":4}}]",
+ "content": "[{\"id\":\"oZvri3L9DM\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">Toolbox</span>\",\"col\":12}},{\"id\":\"U9upR_ICIz\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Site Manager\",\"col\":3}},{\"id\":\"okWdS879OT\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Index Manager\",\"col\":3}},{\"id\":\"ZQbxseLuC9\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Toolbox Settings\",\"col\":3}},{\"id\":\"f3YRJsrkAS\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"wotZaWJVUQ\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Queries\",\"col\":3}},{\"id\":\"A1vgmEcuNY\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Tables\",\"col\":3}},{\"id\":\"pu4Xty2Zwg\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Indexes\",\"col\":3}},{\"id\":\"y4TNRXIWED\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"riOeD-B9cl\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Unused Mariadb Indexes\",\"col\":3}}]",
  "creation": "2023-01-28 12:41:28.998511",
  "custom_blocks": [],
  "docstatus": 0,
@@ -20,6 +20,7 @@
    "link_to": "Unused MariaDB Indexes",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "MariaDB Index",
    "type": "Link"
   },
   {
@@ -30,6 +31,7 @@
    "link_to": "Database Storage Usage By Tables",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Error Log",
    "type": "Link"
   },
   {
@@ -40,6 +42,7 @@
    "link_to": "Audit System Hooks",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "Property Setter",
    "type": "Link"
   },
   {
@@ -50,10 +53,11 @@
    "link_to": "Permitted Documents For User",
    "link_type": "Report",
    "onboard": 0,
+   "report_ref_doctype": "User",
    "type": "Link"
   }
  ],
- "modified": "2023-12-19 19:24:17.537101",
+ "modified": "2024-08-25 18:55:19.752817",
  "modified_by": "Administrator",
  "module": "Toolbox",
  "name": "Toolbox",
@@ -77,13 +81,6 @@
    "link_to": "MariaDB Query",
    "stats_filter": "{\"query\":[\"is\",\"set\"]}",
    "type": "DocType"
-  },
-  {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "Site Manager",
-   "link_to": "site-manager",
-   "type": "Page"
   },
   {
    "color": "Grey",
@@ -113,6 +110,13 @@
    "link_to": "MariaDB Index",
    "stats_filter": "{\"name\":[\"is\",\"set\"]}",
    "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Site Manager",
+   "link_to": "Site Manager",
+   "type": "Dashboard"
   },
   {
    "color": "Grey",
