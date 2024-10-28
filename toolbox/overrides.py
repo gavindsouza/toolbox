@@ -11,6 +11,7 @@ def boot_session(bootinfo):
             }
         }
 
+
 def after_migrate():
     import frappe
 

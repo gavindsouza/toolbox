@@ -4,6 +4,7 @@ from contextlib import suppress
 from re import compile
 
 import frappe
+
 import toolbox
 
 TRACEBACK_PATH_PATTERN = compile(".*/apps/")

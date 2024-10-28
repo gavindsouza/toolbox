@@ -190,7 +190,9 @@ def process_sql_metadata_chunk(
         try:
             explain_data = frappe.db.sql(f"EXPLAIN EXTENDED {query}", as_dict=True)
         except Exception as e:
-            frappe.logger("toolbox").exception(f"process_sql_metadata_chunk: EXPLAIN EXTENDED {query}")
+            frappe.logger("toolbox").exception(
+                f"process_sql_metadata_chunk: EXPLAIN EXTENDED {query}"
+            )
             continue
 
         if not explain_data:

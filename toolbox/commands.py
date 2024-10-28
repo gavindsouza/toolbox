@@ -12,23 +12,19 @@ from frappe.commands import get_site, pass_context
 
 
 @click.group("doctype-manager")
-def doctype_manager_cli():
-    ...
+def doctype_manager_cli(): ...
 
 
 @click.group("sql-recorder")
-def sql_recorder_cli():
-    ...
+def sql_recorder_cli(): ...
 
 
 @click.group("index-manager")
-def index_manager_cli():
-    ...
+def index_manager_cli(): ...
 
 
 @click.group("sql-manager")
-def sql_manager_cli():
-    ...
+def sql_manager_cli(): ...
 
 
 @click.command("start")

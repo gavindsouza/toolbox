@@ -5,7 +5,7 @@ fail_fast: false
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.4.0
+    rev: v5.0.0
     hooks:
       - id: trailing-whitespace
         files: "remote_actions.*"
@@ -15,7 +15,7 @@ repos:
       - id: check-ast
 
   - repo: https://github.com/PyCQA/flake8
-    rev: 6.1.0
+    rev: 7.1.0
     hooks:
       - id: flake8
         additional_dependencies: [
@@ -24,13 +24,13 @@ repos:
         args: ['--config', '.flake8_strict']
 
   - repo: https://github.com/timothycrosley/isort
-    rev: 5.12.0
+    rev: 5.13.2
     hooks:
       - id: isort
         exclude: ".*setup.py$"
 
   - repo: https://github.com/psf/black
-    rev: 23.7.0
+    rev: 24.10.0
     hooks:
       - id: black
         additional_dependencies: ['click']

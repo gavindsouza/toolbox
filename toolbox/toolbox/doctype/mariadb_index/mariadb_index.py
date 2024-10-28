@@ -65,12 +65,10 @@ class MariaDBIndexDocument(Document):
     def db_update(self):
         raise NotImplementedError
 
-    def delete(self):
-        ...
+    def delete(self): ...
 
     @staticmethod
-    def get_stats(args):
-        ...
+    def get_stats(args): ...
 
     def load_from_db(self):
         index, column_name, table = self.name.split("--")
