@@ -185,24 +185,24 @@ class TestUtilHelpers(unittest.TestCase):
         self.assertEqual(wrap("0"), 0.0)
 
     @patch("toolbox.utils.secho")
-    def test_check_dbms_compatibility_warns_non_mariadb(self, mock_secho):
+    def test_check_dbms_compatibility_warns_unknown_db(self, mock_secho):
         from toolbox.utils import check_dbms_compatibility
 
         conf = MagicMock()
-        conf.db_type = "postgres"
+        conf.db_type = "sqlite"
 
         with check_dbms_compatibility(conf):
             pass
 
         mock_secho.assert_called_once()
-        self.assertIn("postgres", mock_secho.call_args[0][0])
+        self.assertIn("sqlite", mock_secho.call_args[0][0])
 
     @patch("toolbox.utils.secho")
-    def test_check_dbms_compatibility_raises_when_requested(self, mock_secho):
+    def test_check_dbms_compatibility_raises_for_unknown_db(self, mock_secho):
         from toolbox.utils import check_dbms_compatibility
 
         conf = MagicMock()
-        conf.db_type = "postgres"
+        conf.db_type = "sqlite"
 
         with self.assertRaises(NotImplementedError):
             with check_dbms_compatibility(conf, raise_error=True):
@@ -214,6 +214,18 @@ class TestUtilHelpers(unittest.TestCase):
 
         conf = MagicMock()
         conf.db_type = "mariadb"
+
+        with check_dbms_compatibility(conf):
+            pass
+
+        mock_secho.assert_not_called()
+
+    @patch("toolbox.utils.secho")
+    def test_check_dbms_compatibility_passes_for_postgres(self, mock_secho):
+        from toolbox.utils import check_dbms_compatibility
+
+        conf = MagicMock()
+        conf.db_type = "postgres"
 
         with check_dbms_compatibility(conf):
             pass

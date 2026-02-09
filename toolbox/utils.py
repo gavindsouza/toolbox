@@ -138,7 +138,7 @@ def record_database_state(init: bool = False):
 
 @contextmanager
 def check_dbms_compatibility(conf, raise_error: bool = False):
-    if conf.db_type != "mariadb":
+    if conf.db_type not in ("mariadb", "postgres"):
         secho(f"WARN: This command might not be compatible with {conf.db_type}", fg="yellow")
         if raise_error:
             raise NotImplementedError(f"Command not compatible with {conf.db_type}")
@@ -170,6 +170,11 @@ def _increment_query_count(mq_table, p_query: str, p_occurrence: int) -> bool:
     rowcount = getattr(frappe.db._cursor, "rowcount", _USE_FALLBACK_PROPERTY)
     if rowcount is not _USE_FALLBACK_PROPERTY:
         return rowcount > 0
+
+    from toolbox.db_adapter import is_postgres
+
+    if is_postgres():
+        return False
     return frappe.db.sql("SELECT ROW_COUNT()", pluck=True)[0] > 0
 
 
@@ -180,10 +185,12 @@ def _explain_and_record_query(p_query: str, p_occurrence: int) -> "MariaDBQuery 
     """
     query = Query(p_query).get_sample()
 
+    from toolbox.db_adapter import get_explain_sql
+
     try:
-        explain_data = frappe.db.sql(f"EXPLAIN EXTENDED {query}", as_dict=True)
+        explain_data = frappe.db.sql(get_explain_sql(query), as_dict=True)
     except Exception:
-        frappe.logger("toolbox").exception(f"EXPLAIN EXTENDED failed: {query}")
+        frappe.logger("toolbox").exception(f"EXPLAIN failed: {query}")
         return None
 
     if not explain_data:
@@ -324,7 +331,9 @@ class Table:
         return self.name
 
     def exists(self) -> bool:
-        return bool(frappe.db.sql("SHOW TABLES LIKE %s", self.name))
+        from toolbox.db_adapter import table_exists
+
+        return table_exists(self.name)
 
     def find_index_candidates(
         self, queries: list[Query], qualifier: Callable | None = None
@@ -474,8 +483,13 @@ class Table:
 
 
 def get_analyzed_result(sql: str, verbose: bool = False):
+    from toolbox.db_adapter import get_analyze_sql, is_postgres, parse_pg_explain_analyze
+
     try:
-        return frappe.db.sql(f"ANALYZE {sql}", as_dict=True, debug=verbose)
+        result = frappe.db.sql(get_analyze_sql(sql), as_dict=True, debug=verbose)
+        if is_postgres():
+            return parse_pg_explain_analyze(result)
+        return result
     except Exception as e:
         frappe.logger("toolbox").error(f"Error while analyzing {sql}: {e}")
         return [{"r_filtered": -1, "r_rows": "0.00", "Extra": "Using where"}]
