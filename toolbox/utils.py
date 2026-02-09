@@ -154,73 +154,80 @@ def handle_redis_connection_error():
         secho("NOTE: Make sure Redis services are running", fg="yellow")
 
 
-def process_sql_metadata_chunk(
-    queries: dict[str, int],
-):
-    EXPLAINABLE_QUERIES = ("select", "insert", "update", "delete")
-    MQ_TABLE = frappe.qb.DocType("MariaDB Query")
-    RECORDED_QUERIES = {}
-    USE_FALLBACK_PROPERTY = object()
+EXPLAINABLE_QUERIES = ("select", "insert", "update", "delete")
+_USE_FALLBACK_PROPERTY = object()
+
+
+def _increment_query_count(mq_table, p_query: str, p_occurence: int) -> bool:
+    """Increment occurence count for an existing query record.
+
+    Returns True if the query was already recorded (count incremented), False if new.
+    """
+    frappe.qb.update(mq_table).set(mq_table.occurence, mq_table.occurence + p_occurence).set(
+        mq_table.modified, now()
+    ).where(mq_table.parameterized_query == p_query).limit(1).run()
+
+    rowcount = getattr(frappe.db._cursor, "rowcount", _USE_FALLBACK_PROPERTY)
+    if rowcount is not _USE_FALLBACK_PROPERTY:
+        return rowcount > 0
+    return frappe.db.sql("SELECT ROW_COUNT()", pluck=True)[0] > 0
+
+
+def _explain_and_record_query(p_query: str, p_occurence: int) -> "MariaDBQuery | None":
+    """Run EXPLAIN on a query sample and create a MariaDB Query record.
+
+    Returns the query record, or None if the query cannot be explained.
+    """
+    query = Query(p_query).get_sample()
+
+    try:
+        explain_data = frappe.db.sql(f"EXPLAIN EXTENDED {query}", as_dict=True)
+    except Exception:
+        frappe.logger("toolbox").exception(f"EXPLAIN EXTENDED failed: {query}")
+        return None
+
+    if not explain_data:
+        frappe.logger("toolbox").warning(f"Cannot explain query: {query}")
+        return None
+
+    # Note: Desk doesn't like Queries with whitespaces in long text for show title in links for forms
+    query_record = record_query(
+        format_sql(query, strip_whitespace=True, keyword_case="upper"),
+        p_query=p_query,
+    )
+    query_record.occurence += p_occurence
+    for explain in explain_data:
+        query_record.apply_explain(explain)
+    query_record.set_new_name()
+    query_record.set_parent_in_children()
+
+    return query_record
+
+
+def process_sql_metadata_chunk(queries: dict[str, int]):
+    mq_table = frappe.qb.DocType("MariaDB Query")
+    recorded_queries: dict[str, list] = {}
 
     for p_query, p_occurence in queries.items():
         if isinstance(p_query, bytes):
             p_query = p_query.decode("utf-8")
-        # this is a parameterized_query
+
         if not p_query.lstrip()[:7].lower().startswith(EXPLAINABLE_QUERIES):
             continue
 
-        # increment occurence count
-        frappe.qb.update(MQ_TABLE).set(MQ_TABLE.occurence, MQ_TABLE.occurence + p_occurence).set(
-            MQ_TABLE.modified, now()
-        ).where(MQ_TABLE.parameterized_query == p_query).limit(1).run()
-
-        # check if query is already recorded (first try cursor's rowcount property)
-        if (
-            rowcount := getattr(frappe.db._cursor, "rowcount", USE_FALLBACK_PROPERTY)
-        ) is not USE_FALLBACK_PROPERTY:
-            if rowcount > 0:
-                continue
-        # fallback to raw sql if cursor property is not available
-        elif frappe.db.sql("SELECT ROW_COUNT()", pluck=True)[0] > 0:
+        if _increment_query_count(mq_table, p_query, p_occurence):
             continue
 
-        query = Query(p_query).get_sample()
-
-        # should check warnings too? unsure at this point
-        try:
-            explain_data = frappe.db.sql(f"EXPLAIN EXTENDED {query}", as_dict=True)
-        except Exception as e:
-            frappe.logger("toolbox").exception(
-                f"process_sql_metadata_chunk: EXPLAIN EXTENDED {query}"
-            )
+        query_record = _explain_and_record_query(p_query, p_occurence)
+        if not query_record:
             continue
-
-        if not explain_data:
-            frappe.logger("toolbox").warning(f"Cannot explain query: {query}")
-            continue
-
-        # Note: Desk doesn't like Queries with whitespaces in long text for show title in links for forms
-        # Better to strip them off and format on demand
-        query_record = record_query(
-            format_sql(query, strip_whitespace=True, keyword_case="upper"),
-            p_query=p_query,
-        )
-        query_record.occurence += p_occurence
-        for explain in explain_data:
-            query_record.apply_explain(explain)
-        query_record.set_new_name()
-        query_record.set_parent_in_children()
 
         for df in query_record.meta.get_table_fields():
-            RECORDED_QUERIES.setdefault(df.options, []).extend(query_record.get(df.fieldname))
-        RECORDED_QUERIES.setdefault(query_record.doctype, []).append(query_record)
+            recorded_queries.setdefault(df.options, []).extend(query_record.get(df.fieldname))
+        recorded_queries.setdefault(query_record.doctype, []).append(query_record)
 
-    for dt, records in RECORDED_QUERIES.items():
-        bulk_insert(
-            doctype=dt,
-            documents=records,
-            ignore_duplicates=True,
-        )
+    for dt, records in recorded_queries.items():
+        bulk_insert(doctype=dt, documents=records, ignore_duplicates=True)
         frappe.logger("toolbox").info(f"Recorded {len(records):,} new '{dt}' records")
 
     return frappe.new_doc(
