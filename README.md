@@ -57,7 +57,7 @@ bench get-app https://github.com/gavindsouza/toolbox.git
 bench --site your-site install-app toolbox
 ```
 
-> **Note:** Toolbox currently supports **MariaDB** only.
+> **Note:** Toolbox supports both **MariaDB** and **PostgreSQL**.
 
 ## Quick Start
 
@@ -149,7 +149,7 @@ bench --site your-site doctype-manager trace purge -d "Sales Invoice"
 |---|---|
 | Frappe | v15, v16 |
 | Python | 3.8+ |
-| Database | MariaDB |
+| Database | MariaDB, PostgreSQL |
 
 ## Planned Features
 
