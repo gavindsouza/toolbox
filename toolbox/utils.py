@@ -495,7 +495,7 @@ class QueryBenchmark:
     def compare_results(
         self, before: list[list[dict]], after: list[list[dict]]
     ) -> list[list[dict]]:
-        results = [[]] * len(before)
+        results = [[] for _ in range(len(before))]
 
         for i, (before_data, after_data) in enumerate(zip(before, after)):
             for before_row, after_row in zip(before_data, after_data):
