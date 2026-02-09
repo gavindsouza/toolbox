@@ -230,11 +230,13 @@ def process_sql_metadata_chunk(queries: dict[str, int]):
         bulk_insert(doctype=dt, documents=records, ignore_duplicates=True)
         frappe.logger("toolbox").info(f"Recorded {len(records):,} new '{dt}' records")
 
-    return frappe.new_doc(
+    summary = frappe.new_doc(
         doctype="SQL Record Summary",
         total_sql_count=sum(queries.values()),
         unique_sql_count=len(queries),
-    ).db_insert()
+    )
+    summary.db_insert()
+    return summary
 
 
 @lru_cache(maxsize=None)
