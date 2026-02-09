@@ -91,11 +91,11 @@ jobs:
 
       - name: Setup
         run: |
-          if [ "${{ matrix.frappe_version }}" = "version-15" ]; then
-            pip install setuptools
-          fi
           pip install frappe-bench
           bench init --skip-redis-config-generation --skip-assets --frappe-branch ${{ matrix.frappe_version }} --python "$(which python)" ~/frappe-bench
+          if [ "${{ matrix.frappe_version }}" = "version-15" ]; then
+            ~/frappe-bench/env/bin/pip install setuptools
+          fi
           mysql --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL character_set_server = 'utf8mb4'"
           mysql --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL collation_server = 'utf8mb4_unicode_ci'"
         env:
