@@ -314,3 +314,98 @@ def get_args(args=None, kwargs=None):
                 f[3 + offset] = ""
 
     return _args
+
+
+# --- Duplicate & Redundant Index Detection (Feature 2) ---
+
+
+def reduce_indexes_to_column_lists(raw_indexes: list[dict]) -> list[dict]:
+    """Convert raw INFORMATION_SCHEMA rows into per-index column lists.
+
+    Input: [{"key_name": "idx", "column_name": "col", "seq_id": 1}, ...]
+    Output: [{"key_name": "idx", "columns": ["col1", "col2"]}, ...]
+    """
+    from itertools import groupby
+
+    sorted_rows = sorted(raw_indexes, key=lambda x: (x["key_name"], x["seq_id"]))
+    result = []
+    for key_name, group in groupby(sorted_rows, key=lambda x: x["key_name"]):
+        columns = [row["column_name"] for row in sorted(group, key=lambda x: x["seq_id"])]
+        result.append({"key_name": key_name, "columns": columns})
+    return result
+
+
+def find_duplicate_indexes(indexes: list[dict]) -> list[dict]:
+    """Find exact duplicate indexes (same columns in same order).
+
+    Returns list of {"redundant": name, "superseded_by": name, "columns": [...]}.
+    PRIMARY KEY is never recommended for dropping.
+    """
+    duplicates = []
+    seen = {}  # column_tuple -> first index name
+
+    for idx in indexes:
+        col_key = tuple(idx["columns"])
+        if col_key in seen:
+            # The later index is redundant; never mark PRIMARY as redundant
+            if idx["key_name"] == "PRIMARY":
+                continue
+            duplicates.append({
+                "redundant": idx["key_name"],
+                "superseded_by": seen[col_key],
+                "columns": idx["columns"],
+            })
+        else:
+            seen[col_key] = idx["key_name"]
+
+    return duplicates
+
+
+def find_redundant_indexes(indexes: list[dict]) -> list[dict]:
+    """Find left-prefix redundant indexes.
+
+    Index (A) is redundant if index (A, B, C) exists, because MySQL uses leftmost prefix.
+    PRIMARY KEY is never marked as redundant.
+
+    Returns list of {"redundant": name, "superseded_by": name, "columns": [...], "superseding_columns": [...]}.
+    """
+    redundant = []
+    # Sort by column count descending so longer indexes are checked first
+    sorted_indexes = sorted(indexes, key=lambda x: len(x["columns"]), reverse=True)
+
+    for i, smaller in enumerate(sorted_indexes):
+        if smaller["key_name"] == "PRIMARY":
+            continue
+
+        for larger in sorted_indexes:
+            if larger["key_name"] == smaller["key_name"]:
+                continue
+            if len(larger["columns"]) <= len(smaller["columns"]):
+                continue
+
+            # Check if smaller is a left-prefix of larger
+            if larger["columns"][:len(smaller["columns"])] == smaller["columns"]:
+                redundant.append({
+                    "redundant": smaller["key_name"],
+                    "superseded_by": larger["key_name"],
+                    "columns": smaller["columns"],
+                    "superseding_columns": larger["columns"],
+                })
+                break  # Only report once per redundant index
+
+    return redundant
+
+
+def analyze_table_indexes(indexes: list[dict]) -> dict:
+    """Analyze a table's indexes for duplicates and left-prefix redundancy.
+
+    Args:
+        indexes: List of {"key_name": str, "columns": list[str]}
+
+    Returns:
+        {"duplicates": [...], "redundant": [...]}
+    """
+    return {
+        "duplicates": find_duplicate_indexes(indexes),
+        "redundant": find_redundant_indexes(indexes),
+    }
