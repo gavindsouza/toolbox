@@ -3,18 +3,24 @@
 
 import re
 from itertools import groupby
-from textwrap import dedent
 
 import frappe
 from frappe.model.document import Document
 
+from toolbox.db_adapter import (
+    get_create_index_ddl,
+    get_drop_index_ddl,
+    get_drop_index_if_exists_ddl,
+    get_index_query as _get_db_index_query,
+    is_postgres,
+)
 from toolbox.utils import IndexCandidate
 
 VALID_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_ ]*$")
 
 TOOLBOX_INDEX_PREFIX = "toolbox_index_"
 
-FIELD_ALIAS = {
+FIELD_ALIAS_MARIADB = {
     "name": "name",
     "owner": "owner",
     "modified_by": "modified_by",
@@ -31,28 +37,36 @@ FIELD_ALIAS = {
     "seq_id": "SEQ_IN_INDEX",
 }
 
-INDEX_QUERY = dedent(
-    """
-    SELECT
-        TABLE_NAME `table`,
-        f.name `frappe_table_id`,
-        INDEX_NAME key_name,
-        SEQ_IN_INDEX seq_id,
-        COLUMN_NAME column_name,
-        NON_UNIQUE non_unique,
-        INDEX_TYPE index_type,
-        CARDINALITY cardinality,
-        COLLATION collation,
-        CONCAT(INDEX_NAME, '--', COLUMN_NAME, '--', TABLE_NAME) name,
-        "Administrator" owner,
-        "Administrator" modified_by,
-        NULL creation,
-        NULL modified
-    FROM
-        INFORMATION_SCHEMA.STATISTICS s LEFT JOIN `tabMariaDB Table` f
-    ON
-        s.TABLE_NAME = f._table_name"""
-)
+FIELD_ALIAS_POSTGRES = {
+    "name": "name",
+    "owner": "owner",
+    "modified_by": "modified_by",
+    "creation": "creation",
+    "modified": "modified",
+    "table": "i.tablename",
+    "key_name": "ix.indexname",
+    "column_name": "a.attname",
+    "non_unique": "non_unique",
+    "index_type": "index_type",
+    "cardinality": "cardinality",
+    "collation": "collation",
+    "frappe_table_id": "f.name",
+    "seq_id": "a.attnum",
+}
+
+
+def _get_field_alias():
+    if is_postgres():
+        return FIELD_ALIAS_POSTGRES
+    return FIELD_ALIAS_MARIADB
+
+
+# Keep FIELD_ALIAS as the default for backward compatibility
+FIELD_ALIAS = FIELD_ALIAS_MARIADB
+
+
+def _get_index_query():
+    return _get_db_index_query()
 
 
 def get_index_name(ic: IndexCandidate) -> str:
@@ -80,11 +94,19 @@ class MariaDBIndexDocument(Document):
 
     def load_from_db(self):
         index, column_name, table = self.name.split("--")
-        document_data = frappe.db.sql(
-            f"{INDEX_QUERY} WHERE TABLE_NAME = %s AND INDEX_NAME = %s and COLUMN_NAME = %s",
-            (table, index, column_name),
-            as_dict=True,
-        )[0]
+        idx_query = _get_index_query()
+        if is_postgres():
+            document_data = frappe.db.sql(
+                f"{idx_query} AND i.tablename = %s AND ix.indexname = %s AND a.attname = %s",
+                (table, index, column_name),
+                as_dict=True,
+            )[0]
+        else:
+            document_data = frappe.db.sql(
+                f"{idx_query} WHERE TABLE_NAME = %s AND INDEX_NAME = %s and COLUMN_NAME = %s",
+                (table, index, column_name),
+                as_dict=True,
+            )[0]
         self.update(document_data)
 
     @staticmethod
@@ -166,7 +188,7 @@ class MariaDBIndex(MariaDBIndexDocument):
                 _validate_identifier(col, "column name")
             try:
                 frappe.db.sql_ddl(
-                    f"CREATE INDEX `{index_name}` ON `{table}` ({', '.join(f'`{col}`' for col in ic)})",
+                    get_create_index_ddl(table, index_name, list(ic)),
                     debug=verbose,
                 )
             except Exception:
@@ -180,7 +202,7 @@ class MariaDBIndex(MariaDBIndexDocument):
             index_name = get_index_name(ic)
             _validate_identifier(index_name, "index name")
             frappe.db.sql_ddl(
-                f"DROP INDEX `{index_name}` ON `{table}`",
+                get_drop_index_ddl(table, index_name),
                 debug=verbose,
             )
 
@@ -193,7 +215,7 @@ class MariaDBIndex(MariaDBIndexDocument):
             if index_name.startswith(TOOLBOX_INDEX_PREFIX) and index_name not in dropped_indexes:
                 _validate_identifier(index_name, "index name")
                 frappe.db.sql_ddl(
-                    f"DROP INDEX IF EXISTS `{index_name}` ON `{table}`",
+                    get_drop_index_if_exists_ddl(table, index_name),
                     debug=verbose,
                 )
                 dropped_indexes.add(index_name)
@@ -203,9 +225,17 @@ ALLOWED_OPERATORS = {"=", "!=", "<", ">", "<=", ">=", "like", "not like", "in", 
 
 
 def wrap_query_field(value: str) -> str:
-    if "`" != value[0] and "`" not in value:
-        return f"`{value}`"
-    return value
+    from toolbox.db_adapter import quote_identifier
+
+    # Already quoted — return as-is
+    if value.startswith("`") or value.startswith('"'):
+        return value
+
+    # Dotted references (e.g. "f.name", "i.tablename") — don't quote the whole thing
+    if "." in value:
+        return value
+
+    return quote_identifier(value)
 
 
 def get_filter_clause(filters: list[list]) -> tuple[str, tuple]:
@@ -246,18 +276,20 @@ def get_accessible_fields(fields: list[str]) -> list[str]:
     if fields == ["*"] or fields == ["count(*)"] or fields == ["count(*) as result"]:
         return fields
 
+    alias = _get_field_alias()
     allowed_fields = []
 
     for field in fields:
         if _x := field.split(".", 1)[-1]:
-            if _x.replace("`", "") in FIELD_ALIAS:
+            if _x.replace("`", "").replace('"', "") in alias:
                 allowed_fields.append(_x)
 
     return allowed_fields
 
 
 def get_mapped_field(field: str) -> str | None:
-    eq_field = field.split(".", 1)[-1].replace("`", "")
+    alias = _get_field_alias()
+    eq_field = field.split(".", 1)[-1].replace("`", "").replace('"', "")
 
     _first_field = eq_field.split(" ")
     first_field = _first_field[0]
@@ -269,15 +301,21 @@ def get_mapped_field(field: str) -> str | None:
     if order not in ("asc", "desc"):
         order = "asc"
 
-    if first_field in FIELD_ALIAS:
+    if first_field in alias:
         return f"{first_field} {order}"
 
     return None
 
 
 def get_index_query(fields: list[str], filters: list[list]) -> tuple[str, tuple]:
+    idx_query = _get_index_query()
     filter_clause, params = get_filter_clause(filters)
-    qry = f"{INDEX_QUERY} {filter_clause}"
+
+    # Postgres index query already has WHERE clause, so use AND instead of WHERE
+    if filter_clause and is_postgres():
+        filter_clause = filter_clause.replace("WHERE ", "AND ", 1)
+
+    qry = f"{idx_query} {filter_clause}"
 
     if fields:
         return f"SELECT {', '.join(fields)} FROM ({qry}) as t", params
@@ -286,7 +324,8 @@ def get_index_query(fields: list[str], filters: list[list]) -> tuple[str, tuple]
 
 
 def get_column_name(fieldname: str) -> str:
-    return wrap_query_field(FIELD_ALIAS.get(fieldname, fieldname))
+    alias = _get_field_alias()
+    return wrap_query_field(alias.get(fieldname, fieldname))
 
 
 def get_args(args=None, kwargs=None):
