@@ -89,18 +89,19 @@ class MariaDBIndexDocument(Document):
         args = get_args(args, kwargs)
         order_by = get_mapped_field(args["order_by"]) or "cardinality desc, name"
         fields = get_accessible_fields(args["fields"])
-        select_query = get_index_query(fields, args["filters"])
+        select_query, params = get_index_query(fields, args["filters"])
 
         query = f"{select_query} ORDER BY {order_by}"
 
         if args.get("page_length"):
-            query += f" LIMIT {args['page_length']}"
+            query += f" LIMIT {int(args['page_length'])}"
 
         if args.get("limit_start"):
-            query += f" OFFSET {args['limit_start']}"
+            query += f" OFFSET {int(args['limit_start'])}"
 
         data = frappe.db.sql(
             query,
+            params,
             as_dict=True,
         )
 
@@ -111,8 +112,8 @@ class MariaDBIndexDocument(Document):
     @staticmethod
     def get_count(args=None, **kwargs):
         args = get_args(args, kwargs)
-        query = get_index_query(["count(distinct name)"], args["filters"])
-        return frappe.db.sql(query)[0][0]
+        query, params = get_index_query(["count(distinct name)"], args["filters"])
+        return frappe.db.sql(query, params)[0][0]
 
 
 class MariaDBIndex(MariaDBIndexDocument):
@@ -180,12 +181,7 @@ class MariaDBIndex(MariaDBIndexDocument):
                 dropped_indexes.add(index_name)
 
 
-def wrap_query_constant(value: str) -> str:
-    if isinstance(value, str):
-        if value.isnumeric():
-            return value
-        return f"'{value}'"
-    return value
+ALLOWED_OPERATORS = {"=", "!=", "<", ">", "<=", ">=", "like", "not like", "in", "not in"}
 
 
 def wrap_query_field(value: str) -> str:
@@ -194,18 +190,38 @@ def wrap_query_field(value: str) -> str:
     return value
 
 
-def get_filter_clause(filters: list[list]) -> str:
+def get_filter_clause(filters: list[list]) -> tuple[str, tuple]:
     if not filters:
-        return ""
+        return "", ()
 
     where_clause = []
+    params = []
 
     for f in filters:
         f = f[:4]
         i = len(f) - 3
-        where_clause.append(f"{get_column_name(f[i])} {f[i+1]} {wrap_query_constant(f[i+2])}")
+        fieldname = f[i]
+        operator = f[i + 1].strip().lower()
+        value = f[i + 2]
 
-    return f"WHERE {' AND '.join(where_clause)}"
+        if operator not in ALLOWED_OPERATORS:
+            frappe.throw(f"Invalid filter operator: {f[i + 1]}")
+
+        column = get_column_name(fieldname)
+
+        if operator in ("in", "not in"):
+            if isinstance(value, (list, tuple)):
+                placeholders = ", ".join(["%s"] * len(value))
+                where_clause.append(f"{column} {operator} ({placeholders})")
+                params.extend(value)
+            else:
+                where_clause.append(f"{column} {operator} (%s)")
+                params.append(value)
+        else:
+            where_clause.append(f"{column} {operator} %s")
+            params.append(value)
+
+    return f"WHERE {' AND '.join(where_clause)}", tuple(params)
 
 
 def get_accessible_fields(fields: list[str]) -> list[str]:
@@ -230,7 +246,10 @@ def get_mapped_field(field: str) -> str | None:
     order = "asc"
 
     if len(_first_field) > 1:
-        order = _first_field[1].strip(",")
+        order = _first_field[1].strip(",").lower()
+
+    if order not in ("asc", "desc"):
+        order = "asc"
 
     if first_field in FIELD_ALIAS:
         return f"{first_field} {order}"
@@ -238,14 +257,14 @@ def get_mapped_field(field: str) -> str | None:
     return None
 
 
-def get_index_query(fields: list[str], filters: list[list]) -> str:
-    filter_clause = get_filter_clause(filters)
+def get_index_query(fields: list[str], filters: list[list]) -> tuple[str, tuple]:
+    filter_clause, params = get_filter_clause(filters)
     qry = f"{INDEX_QUERY} {filter_clause}"
 
     if fields:
-        return f"SELECT {', '.join(fields)} FROM ({qry}) as t"
+        return f"SELECT {', '.join(fields)} FROM ({qry}) as t", params
 
-    return qry
+    return qry, params
 
 
 def get_column_name(fieldname: str) -> str:
