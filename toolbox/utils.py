@@ -196,7 +196,7 @@ def process_sql_metadata_chunk(
             continue
 
         if not explain_data:
-            print(f"Cannot explain query: {query}")
+            frappe.logger("toolbox").warning(f"Cannot explain query: {query}")
             continue
 
         # Note: Desk doesn't like Queries with whitespaces in long text for show title in links for forms
@@ -221,7 +221,7 @@ def process_sql_metadata_chunk(
             documents=records,
             ignore_duplicates=True,
         )
-        print(f"Recorded {len(records):,} new '{dt}' records")
+        frappe.logger("toolbox").info(f"Recorded {len(records):,} new '{dt}' records")
 
     return frappe.new_doc(
         doctype="SQL Record Summary",
@@ -468,7 +468,7 @@ def get_analyzed_result(sql: str, verbose: bool = False):
     try:
         return frappe.db.sql(f"ANALYZE {sql}", as_dict=True, debug=verbose)
     except Exception as e:
-        print(f"ERROR: {e} while analyzing {sql}")
+        frappe.logger("toolbox").error(f"Error while analyzing {sql}: {e}")
         return [{"r_filtered": -1, "r_rows": "0.00", "Extra": "Using where"}]
 
 

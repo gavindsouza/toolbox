@@ -119,7 +119,7 @@ def process_sql_recorder():
         c = frappe.cache
         DATA_KEY = c.make_key(TOOLBOX_RECORDER_DATA)
         QRY_COUNT = c.hlen(DATA_KEY)
-        print(f"Processing {QRY_COUNT:,} queries")
+        frappe.logger("toolbox").info(f"Processing {QRY_COUNT:,} queries")
 
         pipe = c.pipeline()
         pipe.execute_command("HGETALL", DATA_KEY)
@@ -136,7 +136,7 @@ def process_sql_recorder():
             job_id=record_database_state.__name__,
             deduplicate=True,
         )
-        print("Done processing queries across all jobs")
+        frappe.logger("toolbox").info("Done processing queries across all jobs")
 
 
 def process_index_manager(
@@ -195,7 +195,7 @@ def process_index_manager(
             # First condition is likely due to ghost data in MariaDB Query Explain  - this might be a bug, or require a cleanup
             # Second is for derived and temporary tables                            - this is expected
             if verbose:
-                print(f"Skipping {table_id} - table not found")
+                frappe.logger("toolbox").debug(f"Skipping {table_id} - table not found")
             continue
 
         # combine occurences from parameterized query candidates
@@ -216,7 +216,7 @@ def process_index_manager(
 
         if not qualified_index_candidates:
             if verbose:
-                print(f"No qualified index candidates for {table.name}")
+                frappe.logger("toolbox").debug(f"No qualified index candidates for {table.name}")
             continue
 
         # Generate indexes from qualified index candidates, test gains
@@ -243,8 +243,9 @@ def process_index_manager(
         total_indexes_dropped = len(redundant_indexes)
 
         if verbose and (total_indexes_created != total_indexes_dropped):
-            print(f"Optimized {table.name}")
-            print(f"Indexes created: {total_indexes_created}")
-            print(f"Indexes dropped: {total_indexes_dropped}")
+            logger = frappe.logger("toolbox")
+            logger.info(f"Optimized {table.name}")
+            logger.info(f"Indexes created: {total_indexes_created}")
+            logger.info(f"Indexes dropped: {total_indexes_dropped}")
 
     # TODO: Show summary of changes & record 'Index Record Summary'
