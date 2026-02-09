@@ -20,17 +20,33 @@ jobs:
       fail-fast: false
       matrix:
         frappe_version: [version-15, version-16, develop]
+        db_type: [mariadb, postgres]
         include:
           - frappe_version: version-15
+            db_type: mariadb
+            python_version: '3.11'
+            node_version: 18
+          - frappe_version: version-15
+            db_type: postgres
             python_version: '3.11'
             node_version: 18
           - frappe_version: version-16
+            db_type: mariadb
+            python_version: '3.14'
+            node_version: 24
+          - frappe_version: version-16
+            db_type: postgres
             python_version: '3.14'
             node_version: 24
           - frappe_version: develop
+            db_type: mariadb
             python_version: '3.14'
             node_version: 24
-    name: Server (Frappe ${{ matrix.frappe_version }})
+          - frappe_version: develop
+            db_type: postgres
+            python_version: '3.14'
+            node_version: 24
+    name: Server (Frappe ${{ matrix.frappe_version }}, ${{ matrix.db_type }})
 
     services:
       redis-cache:
@@ -52,6 +68,13 @@ jobs:
         ports:
           - 3306:3306
         options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=5s --health-timeout=2s --health-retries=3
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: root
+        ports:
+          - 5432:5432
+        options: --health-cmd="pg_isready" --health-interval=5s --health-timeout=2s --health-retries=3
 
     steps:
       - name: Clone
@@ -89,7 +112,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
 
-      - name: Setup
+      - name: Setup (MariaDB)
+        if: matrix.db_type == 'mariadb'
         run: |
           pip install frappe-bench
           bench init --skip-redis-config-generation --skip-assets --frappe-branch ${{ matrix.frappe_version }} --python "$(which python)" ~/frappe-bench
@@ -98,7 +122,16 @@ jobs:
         env:
           BENCH_USE_UV: 'true'
 
-      - name: Install
+      - name: Setup (PostgreSQL)
+        if: matrix.db_type == 'postgres'
+        run: |
+          pip install frappe-bench
+          bench init --skip-redis-config-generation --skip-assets --frappe-branch ${{ matrix.frappe_version }} --python "$(which python)" ~/frappe-bench
+        env:
+          BENCH_USE_UV: 'true'
+
+      - name: Install (MariaDB)
+        if: matrix.db_type == 'mariadb'
         working-directory: /home/runner/frappe-bench
         run: |
           bench get-app toolbox $GITHUB_WORKSPACE
@@ -107,6 +140,22 @@ jobs:
             env/bin/pip install "setuptools<81"
           fi
           bench new-site --db-root-password root --admin-password admin test_site
+          bench --site test_site install-app toolbox
+          bench --site test_site set-config allow_tests true
+        env:
+          CI: 'Yes'
+          BENCH_USE_UV: 'true'
+
+      - name: Install (PostgreSQL)
+        if: matrix.db_type == 'postgres'
+        working-directory: /home/runner/frappe-bench
+        run: |
+          bench get-app toolbox $GITHUB_WORKSPACE
+          bench setup requirements --dev
+          if [ "${{ matrix.frappe_version }}" = "version-15" ]; then
+            env/bin/pip install "setuptools<81"
+          fi
+          bench new-site --db-root-password root --admin-password admin --db-type postgres --db-host 127.0.0.1 --db-port 5432 test_site
           bench --site test_site install-app toolbox
           bench --site test_site set-config allow_tests true
         env:
