@@ -24,15 +24,12 @@ jobs:
           - frappe_version: version-15
             python_version: '3.11'
             node_version: 18
-            use_uv: false
           - frappe_version: version-16
             python_version: '3.14'
             node_version: 24
-            use_uv: true
           - frappe_version: develop
             python_version: '3.14'
             node_version: 24
-            use_uv: true
     name: Server (Frappe ${{ matrix.frappe_version }})
 
     services:
@@ -99,19 +96,22 @@ jobs:
           mysql --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL character_set_server = 'utf8mb4'"
           mysql --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL collation_server = 'utf8mb4_unicode_ci'"
         env:
-          BENCH_USE_UV: ${{ matrix.use_uv }}
+          BENCH_USE_UV: 'true'
 
       - name: Install
         working-directory: /home/runner/frappe-bench
         run: |
           bench get-app toolbox $GITHUB_WORKSPACE
           bench setup requirements --dev
+          if [ "${{ matrix.frappe_version }}" = "version-15" ]; then
+            env/bin/pip install setuptools
+          fi
           bench new-site --db-root-password root --admin-password admin test_site
           bench --site test_site install-app toolbox
           bench --site test_site set-config allow_tests true
         env:
           CI: 'Yes'
-          BENCH_USE_UV: ${{ matrix.use_uv }}
+          BENCH_USE_UV: 'true'
 
       - name: Run Tests
         working-directory: /home/runner/frappe-bench
