@@ -93,9 +93,6 @@ jobs:
         run: |
           pip install frappe-bench
           bench init --skip-redis-config-generation --skip-assets --frappe-branch ${{ matrix.frappe_version }} --python "$(which python)" ~/frappe-bench
-          if [ "${{ matrix.frappe_version }}" = "version-15" ]; then
-            ~/frappe-bench/env/bin/pip install setuptools
-          fi
           mysql --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL character_set_server = 'utf8mb4'"
           mysql --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL collation_server = 'utf8mb4_unicode_ci'"
         env:
@@ -106,6 +103,9 @@ jobs:
         run: |
           bench get-app toolbox $GITHUB_WORKSPACE
           bench setup requirements --dev
+          if [ "${{ matrix.frappe_version }}" = "version-15" ]; then
+            uv pip install setuptools --python env/bin/python
+          fi
           bench new-site --db-root-password root --admin-password admin test_site
           bench --site test_site install-app toolbox
           bench --site test_site set-config allow_tests true
