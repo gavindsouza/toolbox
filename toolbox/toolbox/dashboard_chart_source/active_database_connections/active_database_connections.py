@@ -13,4 +13,6 @@ def get():
 
 
 def active_database_connections():
-    return frappe.db.sql("show status where `variable_name` = 'Threads_connected'", as_dict=True)
+    from toolbox.db_adapter import get_active_connections
+
+    return get_active_connections()
