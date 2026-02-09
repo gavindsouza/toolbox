@@ -46,7 +46,7 @@ def before_hook(*args, **kwargs):
 
 
 def after_hook(*args, **kwargs):
-    if hasattr(frappe.local, "toolbox_recorder") and frappe.cache().get_value(
+    if hasattr(frappe.local, "toolbox_recorder") and frappe.cache.get_value(
         TOOLBOX_RECORDER_FLAG
     ):
         frappe.local.toolbox_recorder.dump()

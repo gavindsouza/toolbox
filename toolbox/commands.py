@@ -35,7 +35,7 @@ def start_recording(context):
     from toolbox.sql_recorder import TOOLBOX_RECORDER_FLAG
 
     with frappe.init_site(get_site(context)):
-        frappe.cache().set_value(TOOLBOX_RECORDER_FLAG, 1)
+        frappe.cache.set_value(TOOLBOX_RECORDER_FLAG, 1)
 
 
 @click.command("stop")
@@ -46,7 +46,7 @@ def stop_recording(context):
     from toolbox.sql_recorder import TOOLBOX_RECORDER_FLAG
 
     with frappe.init_site(get_site(context)):
-        frappe.cache().delete_value(TOOLBOX_RECORDER_FLAG)
+        frappe.cache.delete_value(TOOLBOX_RECORDER_FLAG)
 
 
 @click.command("drop")
