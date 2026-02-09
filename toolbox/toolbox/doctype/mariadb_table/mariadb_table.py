@@ -49,7 +49,7 @@ class MariaDBTable(Document):
             "MariaDB Query",
             filters={"table": self.name},
             fields=["*", "name as query"],
-            order_by="occurence desc",
+            order_by="occurrence desc",
             update={"doctype": "MariaDB Query Candidate"},
         )
         if frappe.request:

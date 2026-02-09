@@ -11,7 +11,7 @@
   "query",
   "parameterized_query",
   "improved",
-  "occurence",
+  "occurrence",
   "tables",
   "query_explain",
   "call_stack"
@@ -32,10 +32,10 @@
    "label": "Improved"
   },
   {
-   "fieldname": "occurence",
+   "fieldname": "occurrence",
    "fieldtype": "Int",
    "in_list_view": 1,
-   "label": "Occurence",
+   "label": "Occurrence",
    "read_only": 1
   },
   {

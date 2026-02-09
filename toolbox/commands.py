@@ -95,13 +95,13 @@ def cleanup_metadata(context):
         candidates = [q for q, count in c.most_common(10_000) if count > 1]
 
         for query in candidates:
-            all_occurences = frappe.get_all("MariaDB Query", {"query": query}, pluck="name")
-            pick = all_occurences[0]
+            all_occurrences = frappe.get_all("MariaDB Query", {"query": query}, pluck="name")
+            pick = all_occurrences[0]
             frappe.qb.from_(mdb_qry).where(mdb_qry.query == query).where(
                 mdb_qry.name != pick
             ).delete().run()
             doc = frappe.get_doc("MariaDB Query", pick)
-            doc.occurence = len(all_occurences)
+            doc.occurrence = len(all_occurrences)
             doc.save()
             frappe.db.commit()
 
@@ -173,13 +173,13 @@ def drop_toolbox_indexes(context, dry_run: bool = False):
 
 @click.command("optimize")
 @click.option("--table", "table_name", help="Optimize SQL for a given table")
-@click.option("--sql-occurence", help="Minimum occurence as qualifier for optimization", type=int)
+@click.option("--sql-occurrence", help="Minimum occurrence as qualifier for optimization", type=int)
 @click.option("--skip-backtest", is_flag=True, help="Skip backtesting the query")
 @click.option("--verbose", is_flag=True, help="Increase verbosity of output")
 @pass_context
 def optimize_indexes(
     context,
-    sql_occurence: int | None,
+    sql_occurrence: int | None,
     table_name: str = None,
     skip_backtest: bool = False,
     verbose: bool = False,
@@ -192,7 +192,7 @@ def optimize_indexes(
         frappe.connect()
         process_index_manager(
             table_name=table_name,
-            sql_occurence=sql_occurence,
+            sql_occurrence=sql_occurrence,
             skip_backtest=skip_backtest,
             verbose=verbose,
         )

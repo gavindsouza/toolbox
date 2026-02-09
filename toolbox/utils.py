@@ -76,7 +76,7 @@ def record_query(
     query_record = frappe.new_doc("MariaDB Query")
     query_record.query = query
     query_record.parameterized_query = p_query
-    query_record.occurence = 0
+    query_record.occurrence = 0
     query_record.call_stack = frappe.as_json(call_stack)
 
     return query_record
@@ -158,12 +158,12 @@ EXPLAINABLE_QUERIES = ("select", "insert", "update", "delete")
 _USE_FALLBACK_PROPERTY = object()
 
 
-def _increment_query_count(mq_table, p_query: str, p_occurence: int) -> bool:
-    """Increment occurence count for an existing query record.
+def _increment_query_count(mq_table, p_query: str, p_occurrence: int) -> bool:
+    """Increment occurrence count for an existing query record.
 
     Returns True if the query was already recorded (count incremented), False if new.
     """
-    frappe.qb.update(mq_table).set(mq_table.occurence, mq_table.occurence + p_occurence).set(
+    frappe.qb.update(mq_table).set(mq_table.occurrence, mq_table.occurrence + p_occurrence).set(
         mq_table.modified, now()
     ).where(mq_table.parameterized_query == p_query).limit(1).run()
 
@@ -173,7 +173,7 @@ def _increment_query_count(mq_table, p_query: str, p_occurence: int) -> bool:
     return frappe.db.sql("SELECT ROW_COUNT()", pluck=True)[0] > 0
 
 
-def _explain_and_record_query(p_query: str, p_occurence: int) -> "MariaDBQuery | None":
+def _explain_and_record_query(p_query: str, p_occurrence: int) -> "MariaDBQuery | None":
     """Run EXPLAIN on a query sample and create a MariaDB Query record.
 
     Returns the query record, or None if the query cannot be explained.
@@ -195,7 +195,7 @@ def _explain_and_record_query(p_query: str, p_occurence: int) -> "MariaDBQuery |
         format_sql(query, strip_whitespace=True, keyword_case="upper"),
         p_query=p_query,
     )
-    query_record.occurence += p_occurence
+    query_record.occurrence += p_occurrence
     for explain in explain_data:
         query_record.apply_explain(explain)
     query_record.set_new_name()
@@ -208,17 +208,17 @@ def process_sql_metadata_chunk(queries: dict[str, int]):
     mq_table = frappe.qb.DocType("MariaDB Query")
     recorded_queries: dict[str, list] = {}
 
-    for p_query, p_occurence in queries.items():
+    for p_query, p_occurrence in queries.items():
         if isinstance(p_query, bytes):
             p_query = p_query.decode("utf-8")
 
         if not p_query.lstrip()[:7].lower().startswith(EXPLAINABLE_QUERIES):
             continue
 
-        if _increment_query_count(mq_table, p_query, p_occurence):
+        if _increment_query_count(mq_table, p_query, p_occurrence):
             continue
 
-        query_record = _explain_and_record_query(p_query, p_occurence)
+        query_record = _explain_and_record_query(p_query, p_occurrence)
         if not query_record:
             continue
 
@@ -250,9 +250,9 @@ def get_table_id(table_name: str):
 
 
 class Query:
-    def __init__(self, sql: str, occurence: int = 1, table: "Table" = None) -> None:
+    def __init__(self, sql: str, occurrence: int = 1, table: "Table" = None) -> None:
         self.sql = sql.strip()
-        self.occurence = occurence
+        self.occurrence = occurrence
         self.table = table
 
     def __repr__(self) -> str:

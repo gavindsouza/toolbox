@@ -88,9 +88,9 @@ class SQLRecorder:
         key = c.make_key(TOOLBOX_RECORDER_DATA)
         pipe = c.pipeline(transaction=False)
 
-        for query, occurence in Counter(self.queries).items():
-            if not c.hsetnx(key, query, occurence):
-                pipe.hincrby(key, query, occurence)
+        for query, occurrence in Counter(self.queries).items():
+            if not c.hsetnx(key, query, occurrence):
+                pipe.hincrby(key, query, occurrence)
 
         pipe.execute()
         self.queries = []

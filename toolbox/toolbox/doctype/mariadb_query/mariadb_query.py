@@ -24,7 +24,7 @@ class MariaDBQuery(Document):
         call_stack: DF.LongText | None
         improved: DF.LongText | None
         name: DF.Int | None
-        occurence: DF.Int
+        occurrence: DF.Int
         parameterized_query: DF.LongText | None
         query: DF.LongText
         query_explain: DF.Table[MariaDBQueryExplain]

@@ -9,7 +9,7 @@ from toolbox.utils import Query, QueryBenchmark, Table, get_table_id
 
 def process_index_manager(
     table_name: str = None,
-    sql_occurence: int = 0,
+    sql_occurrence: int = 0,
     skip_backtest: bool = False,
     verbose: bool = False,
 ):
@@ -18,13 +18,13 @@ def process_index_manager(
     # 2. If so, check if there are any indexes that can be used - create a new query with the indexes
     # 3. compare # of rows scanned and filtered and execution time, before and after
     #
-    # Note: don't push occurence filter in SQL without considering that we're storing captured queries
+    # Note: don't push occurrence filter in SQL without considering that we're storing captured queries
     # and not candidates. The Query objects here represent query candidates which are reduced considering
-    # parameterized queries and occurences
+    # parameterized queries and occurrences
     ok_types = ["ALL", "index", "range", "ref", "eq_ref", "fulltext", "ref_or_null"]
     table_grouper = lambda q: q.table  # noqa: E731
     sql_qualifier = (
-        (lambda q: q.occurence > sql_occurence) if sql_occurence else None
+        (lambda q: q.occurrence > sql_occurrence) if sql_occurrence else None
     )  # noqa: E731
     filter_map = [
         ["MariaDB Query Explain", "type", "in", ok_types],
@@ -36,7 +36,7 @@ def process_index_manager(
     recorded_queries = frappe.get_all(
         "MariaDB Query",
         filters=filter_map,
-        fields=["query", "parameterized_query", "query_explain.table", "occurence"],
+        fields=["query", "parameterized_query", "query_explain.table", "occurrence"],
         order_by=None,
         distinct=True,
     )
@@ -50,14 +50,14 @@ def process_index_manager(
                 frappe.logger("toolbox").debug(f"Skipping {table_id} - table not found")
             continue
 
-        # combine occurences from parameterized query candidates
+        # combine occurrences from parameterized query candidates
         _qrys = list(_queries)
         _query_candidates = defaultdict(lambda: defaultdict(int))
 
         for q in _qrys:
             reduced_key = q.parameterized_query or q.query
             _query_candidates[reduced_key]["sql"] = q.query
-            _query_candidates[reduced_key]["occurence"] += q.occurence
+            _query_candidates[reduced_key]["occurrence"] += q.occurrence
 
         query_candidates = [Query(**q, table=table) for q in _query_candidates.values()]
         del _query_candidates
