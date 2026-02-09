@@ -1,9 +1,12 @@
 # Copyright (c) 2023, Gavin D'souza and Contributors
 # See license.txt
 
+import unittest
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
+from toolbox.db_adapter import is_postgres
 from toolbox.utils import record_query
 
 
@@ -12,6 +15,7 @@ class TestMariaDBQuery(FrappeTestCase):
         frappe.db.rollback()
         return super().tearDown()
 
+    @unittest.skipIf(is_postgres(), "EXPLAIN format differs on PostgreSQL")
     def test_apply_explain(self):
         query = (
             "SELECT * FROM `tabNote`, `tabDocType` WHERE `tabNote`.`owner` = `tabDocType`.`owner`"

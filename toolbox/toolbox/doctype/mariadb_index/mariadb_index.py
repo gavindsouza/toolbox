@@ -44,7 +44,7 @@ FIELD_ALIAS_POSTGRES = {
     "creation": "creation",
     "modified": "modified",
     "table": "i.tablename",
-    "key_name": "ix.indexname",
+    "key_name": "i.indexname",
     "column_name": "a.attname",
     "non_unique": "non_unique",
     "index_type": "index_type",
@@ -97,7 +97,7 @@ class MariaDBIndexDocument(Document):
         idx_query = _get_index_query()
         if is_postgres():
             document_data = frappe.db.sql(
-                f"{idx_query} AND i.tablename = %s AND ix.indexname = %s AND a.attname = %s",
+                f"{idx_query} AND i.tablename = %s AND i.indexname = %s AND a.attname = %s",
                 (table, index, column_name),
                 as_dict=True,
             )[0]
