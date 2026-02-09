@@ -5,6 +5,9 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 5'  # Run every Friday at midnight UTC
 
 concurrency:
   group: main-toolbox-${{ github.event.number }}
@@ -15,7 +18,19 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-    name: Server
+      matrix:
+        frappe_version: [version-15, version-16, develop]
+        include:
+          - frappe_version: version-15
+            python_version: '3.11'
+            node_version: 18
+          - frappe_version: version-16
+            python_version: '3.14'
+            node_version: 24
+          - frappe_version: develop
+            python_version: '3.14'
+            node_version: 24
+    name: Server (Frappe ${{ matrix.frappe_version }})
 
     services:
       redis-cache:
@@ -31,7 +46,7 @@ jobs:
         ports:
           - 12000:6379
       mariadb:
-        image: mariadb:11.4
+        image: mariadb:11.8
         env:
           MYSQL_ROOT_PASSWORD: root
         ports:
@@ -45,12 +60,13 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: ${{ matrix.python_version }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: ${{ matrix.node_version }}
+          check-latest: true
 
       - name: Cache pip
         uses: actions/cache@v4
@@ -76,9 +92,11 @@ jobs:
       - name: Setup
         run: |
           pip install frappe-bench
-          bench init --skip-redis-config-generation --skip-assets --python "$(which python)" ~/frappe-bench
+          bench init --skip-redis-config-generation --skip-assets --frappe-branch ${{ matrix.frappe_version }} --python "$(which python)" ~/frappe-bench
           mysql --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL character_set_server = 'utf8mb4'"
           mysql --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL collation_server = 'utf8mb4_unicode_ci'"
+        env:
+          BENCH_USE_UV: 'true'
 
       - name: Install
         working-directory: /home/runner/frappe-bench
@@ -90,6 +108,7 @@ jobs:
           bench --site test_site set-config allow_tests true
         env:
           CI: 'Yes'
+          BENCH_USE_UV: 'true'
 
       - name: Run Tests
         working-directory: /home/runner/frappe-bench
