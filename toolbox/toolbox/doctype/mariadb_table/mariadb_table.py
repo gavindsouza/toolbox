@@ -82,7 +82,9 @@ class MariaDBTable(Document):
         )
 
     def set_exists_check(self):
-        if frappe.db.sql("SHOW TABLES LIKE %s", self._table_name):
+        from toolbox.db_adapter import table_exists
+
+        if table_exists(self._table_name):
             self._table_exists = True
 
     @property
@@ -96,17 +98,23 @@ class MariaDBTable(Document):
         self._num_queries = value
 
     def _validate_table_name(self):
+        from toolbox.db_adapter import table_exists
+
         if not self._table_name or not VALID_TABLE_NAME.match(self._table_name):
             frappe.throw(f"Invalid table name: {self._table_name}")
-        if not frappe.db.sql("SHOW TABLES LIKE %s", self._table_name):
+        if not table_exists(self._table_name):
             frappe.throw(f"Table does not exist: {self._table_name}")
 
     @frappe.whitelist()
     def analyze(self):
+        from toolbox.db_adapter import get_analyze_table_sql
+
         self._validate_table_name()
-        return frappe.db.sql(f"ANALYZE TABLE `{self._table_name}`")
+        return frappe.db.sql(get_analyze_table_sql(self._table_name))
 
     @frappe.whitelist()
     def optimize(self):
+        from toolbox.db_adapter import get_optimize_sql
+
         self._validate_table_name()
-        return frappe.db.sql(f"OPTIMIZE TABLE `{self._table_name}`")
+        return frappe.db.sql(get_optimize_sql(self._table_name))
