@@ -6,8 +6,6 @@
 
 import re
 
-import frappe
-
 # Max values for signed/unsigned integer types
 _MAX_VALUES = {
     "tinyint": 127,
@@ -63,37 +61,26 @@ def get_pk_exhaustion_report(min_usage_percent: float = 0.0) -> list[dict]:
     Returns:
         List of dicts sorted by usage_percent descending.
     """
-    rows = frappe.db.sql(
-        """
-        SELECT
-            t.TABLE_NAME,
-            t.AUTO_INCREMENT,
-            c.COLUMN_TYPE
-        FROM INFORMATION_SCHEMA.TABLES t
-        JOIN INFORMATION_SCHEMA.COLUMNS c
-            ON t.TABLE_SCHEMA = c.TABLE_SCHEMA
-            AND t.TABLE_NAME = c.TABLE_NAME
-            AND c.COLUMN_KEY = 'PRI'
-            AND c.EXTRA LIKE '%%auto_increment%%'
-        WHERE t.TABLE_SCHEMA = DATABASE()
-            AND t.AUTO_INCREMENT IS NOT NULL
-        """,
-        as_dict=True,
-    )
+    from toolbox.db_adapter import get_max_value_for_type_pg, get_pk_exhaustion_data, is_postgres
+
+    rows = get_pk_exhaustion_data()
 
     report = []
     for row in rows:
-        max_value = get_max_value_for_type(row["COLUMN_TYPE"])
+        if is_postgres():
+            max_value = get_max_value_for_type_pg(row["column_type"])
+        else:
+            max_value = get_max_value_for_type(row["column_type"])
         if max_value is None:
             continue
 
-        usage = calculate_pk_usage(row["AUTO_INCREMENT"], max_value)
+        usage = calculate_pk_usage(row["auto_increment"], max_value)
         severity = classify_pk_severity(usage)
 
         if usage is not None and usage >= min_usage_percent:
             report.append({
-                "table_name": row["TABLE_NAME"],
-                "auto_increment": row["AUTO_INCREMENT"],
+                "table_name": row["table_name"],
+                "auto_increment": row["auto_increment"],
                 "max_value": max_value,
                 "usage_percent": round(usage, 3),
                 "severity": severity,

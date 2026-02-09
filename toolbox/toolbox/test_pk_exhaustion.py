@@ -108,16 +108,14 @@ class TestPKSeverityClassification(unittest.TestCase):
 class TestGetPKExhaustionReport(unittest.TestCase):
     """Test the full report generation."""
 
-    @patch("toolbox.toolbox.doctype.mariadb_index.pk_exhaustion.frappe")
+    @patch("toolbox.db_adapter.frappe")
     def test_report_structure(self, mock_frappe):
         from toolbox.toolbox.doctype.mariadb_index.pk_exhaustion import get_pk_exhaustion_report
 
-        mock_frappe.db.sql.side_effect = [
-            # First call: get tables with auto-increment
-            [
-                {"TABLE_NAME": "tabUser", "AUTO_INCREMENT": 1000, "COLUMN_TYPE": "int(11)"},
-                {"TABLE_NAME": "tabActivity Log", "AUTO_INCREMENT": 2_000_000_000, "COLUMN_TYPE": "int(11)"},
-            ],
+        mock_frappe.conf.db_type = "mariadb"
+        mock_frappe.db.sql.return_value = [
+            {"table_name": "tabUser", "auto_increment": 1000, "column_type": "int(11)"},
+            {"table_name": "tabActivity Log", "auto_increment": 2_000_000_000, "column_type": "int(11)"},
         ]
 
         report = get_pk_exhaustion_report()
@@ -131,13 +129,14 @@ class TestGetPKExhaustionReport(unittest.TestCase):
             self.assertIn("usage_percent", entry)
             self.assertIn("severity", entry)
 
-    @patch("toolbox.toolbox.doctype.mariadb_index.pk_exhaustion.frappe")
+    @patch("toolbox.db_adapter.frappe")
     def test_sorts_by_usage_desc(self, mock_frappe):
         from toolbox.toolbox.doctype.mariadb_index.pk_exhaustion import get_pk_exhaustion_report
 
+        mock_frappe.conf.db_type = "mariadb"
         mock_frappe.db.sql.return_value = [
-            {"TABLE_NAME": "tabLow", "AUTO_INCREMENT": 100, "COLUMN_TYPE": "int(11)"},
-            {"TABLE_NAME": "tabHigh", "AUTO_INCREMENT": 2_000_000_000, "COLUMN_TYPE": "int(11)"},
+            {"table_name": "tabLow", "auto_increment": 100, "column_type": "int(11)"},
+            {"table_name": "tabHigh", "auto_increment": 2_000_000_000, "column_type": "int(11)"},
         ]
 
         report = get_pk_exhaustion_report()
@@ -145,19 +144,36 @@ class TestGetPKExhaustionReport(unittest.TestCase):
         self.assertEqual(report[0]["table_name"], "tabHigh")
         self.assertEqual(report[1]["table_name"], "tabLow")
 
-    @patch("toolbox.toolbox.doctype.mariadb_index.pk_exhaustion.frappe")
+    @patch("toolbox.db_adapter.frappe")
     def test_filters_by_threshold(self, mock_frappe):
         from toolbox.toolbox.doctype.mariadb_index.pk_exhaustion import get_pk_exhaustion_report
 
+        mock_frappe.conf.db_type = "mariadb"
         mock_frappe.db.sql.return_value = [
-            {"TABLE_NAME": "tabLow", "AUTO_INCREMENT": 100, "COLUMN_TYPE": "int(11)"},
-            {"TABLE_NAME": "tabHigh", "AUTO_INCREMENT": 2_000_000_000, "COLUMN_TYPE": "int(11)"},
+            {"table_name": "tabLow", "auto_increment": 100, "column_type": "int(11)"},
+            {"table_name": "tabHigh", "auto_increment": 2_000_000_000, "column_type": "int(11)"},
         ]
 
         report = get_pk_exhaustion_report(min_usage_percent=50.0)
 
         self.assertEqual(len(report), 1)
         self.assertEqual(report[0]["table_name"], "tabHigh")
+
+    @patch("toolbox.db_adapter.frappe")
+    def test_postgres_report(self, mock_frappe):
+        from toolbox.toolbox.doctype.mariadb_index.pk_exhaustion import get_pk_exhaustion_report
+
+        mock_frappe.conf.db_type = "postgres"
+        mock_frappe.db.sql.return_value = [
+            {"sequencename": "tabuser_id_seq", "data_type": "integer", "last_value": 1000, "max_value": 2147483647},
+            {"sequencename": "tablog_id_seq", "data_type": "bigint", "last_value": 5000, "max_value": 9223372036854775807},
+        ]
+
+        report = get_pk_exhaustion_report()
+
+        self.assertEqual(len(report), 2)
+        self.assertEqual(report[0]["table_name"], "tabuser")
+        self.assertEqual(report[1]["table_name"], "tablog")
 
 
 class TestParseColumnType(unittest.TestCase):
