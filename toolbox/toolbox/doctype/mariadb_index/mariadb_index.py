@@ -1,6 +1,7 @@
 # Copyright (c) 2023, Gavin D'souza and contributors
 # For license information, please see license.txt
 
+import re
 from itertools import groupby
 from textwrap import dedent
 
@@ -8,6 +9,8 @@ import frappe
 from frappe.model.document import Document
 
 from toolbox.utils import IndexCandidate
+
+VALID_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_ ]*$")
 
 TOOLBOX_INDEX_PREFIX = "toolbox_index_"
 
@@ -54,6 +57,11 @@ INDEX_QUERY = dedent(
 
 def get_index_name(ic: IndexCandidate) -> str:
     return f"{TOOLBOX_INDEX_PREFIX}{'_'.join(ic)}"
+
+
+def _validate_identifier(value: str, label: str = "identifier"):
+    if not value or not VALID_IDENTIFIER.match(value):
+        frappe.throw(f"Invalid {label}: {value}")
 
 
 class MariaDBIndexDocument(Document):
@@ -149,11 +157,16 @@ class MariaDBIndex(MariaDBIndexDocument):
     def create(
         table, index_candidates: list[IndexCandidate], verbose=False
     ) -> list[IndexCandidate]:
+        _validate_identifier(table, "table name")
         failures = []
         for ic in index_candidates:
+            index_name = get_index_name(ic)
+            _validate_identifier(index_name, "index name")
+            for col in ic:
+                _validate_identifier(col, "column name")
             try:
                 frappe.db.sql_ddl(
-                    f"CREATE INDEX `{get_index_name(ic)}` ON `{table}` ({', '.join(f'`{i}`' for i in ic)})",
+                    f"CREATE INDEX `{index_name}` ON `{table}` ({', '.join(f'`{col}`' for col in ic)})",
                     debug=verbose,
                 )
             except Exception:
@@ -162,18 +175,23 @@ class MariaDBIndex(MariaDBIndexDocument):
 
     @staticmethod
     def drop(table, index_candidates: list[IndexCandidate], verbose=False):
+        _validate_identifier(table, "table name")
         for ic in index_candidates:
+            index_name = get_index_name(ic)
+            _validate_identifier(index_name, "index name")
             frappe.db.sql_ddl(
-                f"DROP INDEX `{get_index_name(ic)}` ON `{table}`",
+                f"DROP INDEX `{index_name}` ON `{table}`",
                 debug=verbose,
             )
 
     @staticmethod
     def drop_toolbox_indexes(table, verbose=False):
+        _validate_identifier(table, "table name")
         dropped_indexes = set()
         for index in MariaDBIndex.get_indexes(table):
             index_name = index["key_name"]
             if index_name.startswith(TOOLBOX_INDEX_PREFIX) and index_name not in dropped_indexes:
+                _validate_identifier(index_name, "index name")
                 frappe.db.sql_ddl(
                     f"DROP INDEX IF EXISTS `{index_name}` ON `{table}`",
                     debug=verbose,
