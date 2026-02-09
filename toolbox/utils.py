@@ -163,9 +163,18 @@ def _increment_query_count(mq_table, p_query: str, p_occurrence: int) -> bool:
 
     Returns True if the query was already recorded (count incremented), False if new.
     """
-    frappe.qb.update(mq_table).set(mq_table.occurrence, mq_table.occurrence + p_occurrence).set(
-        mq_table.modified, now()
-    ).where(mq_table.parameterized_query == p_query).limit(1).run()
+    from toolbox.db_adapter import is_postgres
+
+    query = (
+        frappe.qb.update(mq_table)
+        .set(mq_table.occurrence, mq_table.occurrence + p_occurrence)
+        .set(mq_table.modified, now())
+        .where(mq_table.parameterized_query == p_query)
+    )
+    # Postgres does not support LIMIT on UPDATE
+    if not is_postgres():
+        query = query.limit(1)
+    query.run()
 
     rowcount = getattr(frappe.db._cursor, "rowcount", _USE_FALLBACK_PROPERTY)
     if rowcount is not _USE_FALLBACK_PROPERTY:
@@ -203,8 +212,14 @@ def _explain_and_record_query(p_query: str, p_occurrence: int) -> "MariaDBQuery 
         p_query=p_query,
     )
     query_record.occurrence += p_occurrence
-    for explain in explain_data:
-        query_record.apply_explain(explain)
+
+    from toolbox.db_adapter import is_postgres
+
+    # Postgres EXPLAIN returns a text plan, not the structured MariaDB format
+    # that apply_explain() expects. Skip explain processing on Postgres for now.
+    if not is_postgres():
+        for explain in explain_data:
+            query_record.apply_explain(explain)
     query_record.set_new_name()
     query_record.set_parent_in_children()
 

@@ -3,6 +3,7 @@
 
 import unittest
 
+from toolbox.db_adapter import is_postgres
 from toolbox.toolbox.doctype.mariadb_index.mariadb_index import (
     ALLOWED_OPERATORS,
     FIELD_ALIAS,
@@ -16,28 +17,36 @@ from toolbox.toolbox.doctype.mariadb_index.mariadb_index import (
     wrap_query_field,
 )
 
+_PG = is_postgres()
+
 
 class TestWrapQueryField(unittest.TestCase):
-    """Test backtick wrapping for field names."""
+    """Test identifier quoting for field names."""
 
     def test_wraps_plain_field(self):
-        self.assertEqual(wrap_query_field("name"), "`name`")
+        expected = '"name"' if _PG else "`name`"
+        self.assertEqual(wrap_query_field("name"), expected)
 
     def test_does_not_double_wrap(self):
         self.assertEqual(wrap_query_field("`name`"), "`name`")
 
     def test_wraps_field_with_spaces(self):
-        self.assertEqual(wrap_query_field("my field"), "`my field`")
+        expected = '"my field"' if _PG else "`my field`"
+        self.assertEqual(wrap_query_field("my field"), expected)
 
 
 class TestGetColumnName(unittest.TestCase):
     def test_known_alias_maps_correctly(self):
         result = get_column_name("table")
-        self.assertIn("TABLE_NAME", result)
+        if _PG:
+            self.assertIn("tablename", result)
+        else:
+            self.assertIn("TABLE_NAME", result)
 
     def test_unknown_field_returned_wrapped(self):
         result = get_column_name("unknown_col")
-        self.assertEqual(result, "`unknown_col`")
+        expected = '"unknown_col"' if _PG else "`unknown_col`"
+        self.assertEqual(result, expected)
 
 
 class TestGetAccessibleFields(unittest.TestCase):
@@ -204,7 +213,10 @@ class TestGetIndexQuery(unittest.TestCase):
 
     def test_no_filters_no_subquery(self):
         query, params = get_index_query([], [])
-        self.assertIn("INFORMATION_SCHEMA.STATISTICS", query)
+        if _PG:
+            self.assertIn("pg_indexes", query)
+        else:
+            self.assertIn("INFORMATION_SCHEMA.STATISTICS", query)
         self.assertEqual(params, ())
 
     def test_with_fields_wraps_in_subquery(self):

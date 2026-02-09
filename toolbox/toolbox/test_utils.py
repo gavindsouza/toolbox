@@ -1,6 +1,9 @@
+import unittest
+
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
+from toolbox.db_adapter import is_postgres
 from toolbox.utils import (
     EXPLAINABLE_QUERIES,
     IndexCandidate,
@@ -146,11 +149,13 @@ class TestIncrementQueryCount(FrappeTestCase):
         frappe.db.rollback()
         return super().tearDown()
 
+    @unittest.skipIf(is_postgres(), "Frappe query builder quoting differs on PostgreSQL")
     def test_returns_false_for_new_query(self):
         mq_table = frappe.qb.DocType("MariaDB Query")
         result = _increment_query_count(mq_table, "SELECT `nonexistent_xyz_query` FROM dual", 5)
         self.assertFalse(result)
 
+    @unittest.skipIf(is_postgres(), "Frappe query builder quoting differs on PostgreSQL")
     def test_returns_true_for_existing_query(self):
         from toolbox.utils import record_query
 
@@ -173,6 +178,7 @@ class TestExplainAndRecordQuery(FrappeTestCase):
         frappe.db.rollback()
         return super().tearDown()
 
+    @unittest.skipIf(is_postgres(), "apply_explain expects MariaDB EXPLAIN format")
     def test_returns_record_for_valid_query(self):
         result = _explain_and_record_query("SELECT `name` FROM `tabDocType`", 5)
         self.assertIsNotNone(result)

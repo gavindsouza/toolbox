@@ -4,6 +4,7 @@
 import frappe
 from frappe.tests.utils import FrappeTestCase
 
+from toolbox.db_adapter import is_postgres
 from toolbox.doctypes import MariaDBIndex
 from toolbox.toolbox.doctype.mariadb_index.mariadb_index import (
     ALLOWED_OPERATORS,
@@ -31,7 +32,12 @@ class TestMariaDBIndex(FrappeTestCase):
         c_3 = MariaDBIndex.get_count({"limit": 20})
         self.assertNotEqual(c_3, 20)  # limit is ignored
 
-        c_4 = MariaDBIndex.get_count({"filters": [["MariaDB Query", "key_name", "=", "PRIMARY"]]})
+        # Postgres uses "<table>_pkey" for primary keys; MariaDB uses "PRIMARY"
+        if is_postgres():
+            pk_filter = [["MariaDB Query", "key_name", "like", "%_pkey"]]
+        else:
+            pk_filter = [["MariaDB Query", "key_name", "=", "PRIMARY"]]
+        c_4 = MariaDBIndex.get_count({"filters": pk_filter})
         self.assertTrue(c_4 > 0)
         self.assertTrue(c_4 < c_3)
 
@@ -123,18 +129,24 @@ class TestFilterClauseSecurity(FrappeTestCase):
         self.assertEqual(params, ("PRIMARY",))
 
     def test_parameterized_filters_work_end_to_end(self):
-        results = MariaDBIndex.get_list(
-            filters=[["key_name", "=", "PRIMARY"]],
-            limit=5,
-        )
+        if is_postgres():
+            filters = [["key_name", "like", "%_pkey"]]
+        else:
+            filters = [["key_name", "=", "PRIMARY"]]
+        results = MariaDBIndex.get_list(filters=filters, limit=5)
         self.assertIsInstance(results, list)
         for r in results:
-            self.assertEqual(r["key_name"], "PRIMARY")
+            if is_postgres():
+                self.assertTrue(r["key_name"].endswith("_pkey"))
+            else:
+                self.assertEqual(r["key_name"], "PRIMARY")
 
     def test_parameterized_count_works_end_to_end(self):
-        count = MariaDBIndex.get_count(
-            {"filters": [["key_name", "=", "PRIMARY"]]}
-        )
+        if is_postgres():
+            filters = [["key_name", "like", "%_pkey"]]
+        else:
+            filters = [["key_name", "=", "PRIMARY"]]
+        count = MariaDBIndex.get_count({"filters": filters})
         self.assertIsInstance(count, int)
         self.assertGreater(count, 0)
 
