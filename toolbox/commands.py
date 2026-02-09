@@ -186,7 +186,7 @@ def optimize_indexes(
 ):
     import frappe
 
-    from toolbox.toolbox.doctype.toolbox_settings.toolbox_settings import process_index_manager
+    from toolbox.index_manager import process_index_manager
 
     with frappe.init_site(get_site(context)):
         frappe.connect()
