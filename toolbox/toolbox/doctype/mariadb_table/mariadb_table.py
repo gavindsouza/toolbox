@@ -1,8 +1,12 @@
 # Copyright (c) 2023, Gavin D'souza and contributors
 # For license information, please see license.txt
 
+import re
+
 import frappe
 from frappe.model.document import Document
+
+VALID_TABLE_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_ ]*$")
 
 
 class MariaDBTable(Document):
@@ -91,10 +95,18 @@ class MariaDBTable(Document):
     def num_queries(self, value):
         self._num_queries = value
 
+    def _validate_table_name(self):
+        if not self._table_name or not VALID_TABLE_NAME.match(self._table_name):
+            frappe.throw(f"Invalid table name: {self._table_name}")
+        if not frappe.db.sql("SHOW TABLES LIKE %s", self._table_name):
+            frappe.throw(f"Table does not exist: {self._table_name}")
+
     @frappe.whitelist()
     def analyze(self):
+        self._validate_table_name()
         return frappe.db.sql(f"ANALYZE TABLE `{self._table_name}`")
 
     @frappe.whitelist()
     def optimize(self):
+        self._validate_table_name()
         return frappe.db.sql(f"OPTIMIZE TABLE `{self._table_name}`")
